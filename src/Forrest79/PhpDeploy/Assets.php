@@ -156,9 +156,9 @@ class Assets
 
 		$mapCommand = '';
 		if ($createMap === TRUE) {
-			$mapCommand = '--source-map=' . substr($destinationFile, 0, strrpos($destinationFile, '.')) . '.map ';
+			$mapCommand = '--source-map --source-map-rootpath=/css ';
 		}
-		exec($command = 'lessc --clean-css ' . $mapCommand . $sourceFile . ' ' . $destinationFile . ' 2>&1', $output, $returnVal);
+		exec($command = 'lessc --clean-css="--keepSpecialComments=0" ' . $mapCommand . $sourceFile . ' ' . $destinationFile . ' 2>&1', $output, $returnVal);
 		if ($returnVal !== 0) {
 			throw new \RuntimeException('Error while compiling less (' . $command . '): ' . implode("\n", $output));
 		}
@@ -182,11 +182,15 @@ class Assets
 
 		$mapCommand = '';
 		if ($createMap === TRUE) {
-			$mapCommand = '--source-map ';
+			$mapCommand = '--source-map url=' . basename($destinationFile) . '.map ';
 		}
 		exec($command = 'uglifyjs ' . implode(' ', $sourceFiles) . ' -o ' . $destinationFile . ' --compress ' .  $mapCommand . '2>&1', $output, $returnVal);
 		if ($returnVal !== 0) {
 			throw new \RuntimeException('Error while compiling js (' . $command . '): ' . implode("\n", $output));
+		}
+		if ($createMap === TRUE) {
+			$mapFile = $destinationFile . '.map';
+			file_put_contents($mapFile, str_replace($this->sourceDirectory, '', file_get_contents($mapFile)));
 		}
 	}
 
