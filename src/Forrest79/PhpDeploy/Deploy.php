@@ -166,16 +166,15 @@ class Deploy
 			$host = $this->environment['ssh']['server'];
 		}
 
+		$credentials = $this->environment['ssh'];
 
-		$key = $host . ':' . $port;
+		$key = $credentials['username'] . '@' . $host . ':' . $port;
 
 		if (!isset($this->sshConnections[$key])) {
 			$connection = ssh2_connect($host, $port, ['hostkey' => 'ssh-rsa']);
 			if ($connection === FALSE) {
 				throw new \RuntimeException('SSH can\'t connet to host "' . $host . '":' . $port . '.');
 			}
-
-			$credentials = $this->environment['ssh'];
 
 			if (isset($credentials['public_key'])) {
 				if (!ssh2_auth_pubkey_file($connection, $credentials['username'], $credentials['public_key'], $credentials['private_key'], !empty($credentials['passphrase']) ? $credentials['passphrase'] : NULL)) {
