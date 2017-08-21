@@ -28,12 +28,19 @@ class Assets
 	private $destinationDirectory;
 
 	/** @var string */
+	private $localSourceDirectory;
+
+	/** @var string */
 	private $configFile;
 
 
-	public function __construct(array $config)
+	public function __construct(array $config, array $localConfig = [])
 	{
 		$this->config = $config;
+
+		if (isset($localConfig['localSourceDirectory'])) {
+			$this->localSourceDirectory = rtrim($localConfig['localSourceDirectory'], '\\/');
+		}
 	}
 
 
@@ -149,16 +156,17 @@ class Assets
 	 */
 	private function compilesLess($sourceFile, $destinationFile, $createMap)
 	{
-		$sourceFile = $this->sourceDirectory . DIRECTORY_SEPARATOR . $sourceFile;
-		$destinationFile = $this->destinationDirectory . DIRECTORY_SEPARATOR . $destinationFile;
+		$sourceFileAbsolute = $this->sourceDirectory . DIRECTORY_SEPARATOR . $sourceFile;
+		$destinationFileAbsolute = $this->destinationDirectory . DIRECTORY_SEPARATOR . $destinationFile;
 
-		Utils\FileSystem::createDir(dirname($destinationFile));
+		Utils\FileSystem::createDir(dirname($destinationFileAbsolute));
 
 		$mapCommand = '';
 		if ($createMap === TRUE) {
-			$mapCommand = '--source-map --source-map-rootpath=/css ';
+			$sourceMapDirectory = dirname($this->localSourceDirectory ? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $sourceFile) : $sourceFile);
+			$mapCommand = '--source-map --source-map-rootpath=file:///' . $sourceMapDirectory . ' ';
 		}
-		exec($command = 'lessc --clean-css="--keepSpecialComments=0" ' . $mapCommand . $sourceFile . ' ' . $destinationFile . ' 2>&1', $output, $returnVal);
+		exec($command = 'lessc --clean-css="--keepSpecialComments=0" ' . $mapCommand . $sourceFileAbsolute . ' ' . $destinationFileAbsolute . ' 2>&1', $output, $returnVal);
 		if ($returnVal !== 0) {
 			throw new \RuntimeException('Error while compiling less (' . $command . '): ' . implode("\n", $output));
 		}
@@ -176,8 +184,14 @@ class Assets
 
 		Utils\FileSystem::createDir(dirname($destinationFile));
 
-		array_walk($sourceFiles, function (& $file) {
+		$mapSources = [];
+
+		array_walk($sourceFiles, function (& $file) use ($createMap, & $mapSources) {
+			$fileRelative = $file;
 			$file = $this->sourceDirectory . DIRECTORY_SEPARATOR . $file;
+			if ($createMap === TRUE) {
+				$mapSources[$file] = 'file:///' . ($this->localSourceDirectory ? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $fileRelative) : realpath($file));
+			}
 		});
 
 		$mapCommand = '';
@@ -190,7 +204,7 @@ class Assets
 		}
 		if ($createMap === TRUE) {
 			$mapFile = $destinationFile . '.map';
-			file_put_contents($mapFile, str_replace($this->sourceDirectory, '', file_get_contents($mapFile)));
+			file_put_contents($mapFile, strtr(file_get_contents($mapFile), $mapSources));
 		}
 	}
 

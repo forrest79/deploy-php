@@ -98,7 +98,15 @@ return (new PhpDeploy\Assets([
         'type' => PhpDeploy\Assets::COPY,
         'env' => PhpDeploy\Assets::DEBUG,
     ],
-]));
+], (file_exists($assetsLocalFile = (__DIR__ . '/assets.local.php'))) ? require $assetsLocalFile : []));
+```
+
+In `deploy/assets.local.php` you can define local source assets directory, if you're using some virtual server, where the paths are different from your host paths. This directory will be used for JS and CSS map files to property open source files in browser console:
+
+```php
+return [
+	'localSourceDirectory' => 'P:/app/assets',
+];
 ```
 
 In `app/bootstrap.php`:
