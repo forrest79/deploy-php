@@ -1,5 +1,7 @@
 Forrest79/PhpDeploy
-======
+===================
+
+[![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://github.com/forrest79/PhpDeploy/blob/master/license.md)
 
 Simple assets builder and application deploy helper.
 
@@ -58,7 +60,7 @@ To build assets you need first call `setup($configNeon, $sourceDirectory, $desti
 - `$sourceDirectory` directory with source assets files
 - `$destinationDirectory` directory where assets will be built
 
-And finally run `buildDebug()` or `buildProduction()` method. First builds assets only if there was some changed file and creates new hash from all files timestamp, the second builds assets everytime and creates hash from every files content. 
+And finally run `buildDebug()` or `buildProduction()` method. First builds assets only if there was some changed file and creates new hash from all files timestamp, the second builds assets everytime and creates hash from every files content.
 
 Neon file with hash has this structure:
 
