@@ -1,9 +1,8 @@
-<?php
+<?php declare(strict_types=1);
 
-namespace Forrest79\PhpDeploy;
+namespace Forrest79\DeployPhp;
 
 use Nette\Utils;
-
 
 class Deploy
 {
@@ -17,10 +16,10 @@ class Deploy
 	private $sshConnections = [];
 
 
-	public function __construct($environment, array $additionalConfig = [])
+	public function __construct(string $environment, array $additionalConfig = [])
 	{
 		if (!isset($this->config[$environment])) {
-			throw new \RuntimeException('Environment \'' . $environment . '\' not exists in configuration.');
+			throw new \RuntimeException(sprintf('Environment \'%s\' not exists in configuration.', $environment));
 		}
 
 		$this->environment = array_replace_recursive($this->config[$environment], $additionalConfig);
@@ -29,25 +28,24 @@ class Deploy
 	}
 
 
-	protected function setup()
+	protected function setup(): void
 	{
 	}
 
 
-	protected function delete($path)
+	protected function delete(string $path): void
 	{
 		Utils\FileSystem::delete($path);
 	}
 
 
-	protected function makeDir($path)
+	protected function makeDir(string $path): void
 	{
 		Utils\FileSystem::createDir($path, 0755);
 	}
 
 
-	/** @return bool */
-	protected function gitCheckout($gitRootDirectory, $checkoutDirectory, $branch)
+	protected function gitCheckout(string $gitRootDirectory, string $checkoutDirectory, string $branch): bool
 	{
 		$zipFile = $checkoutDirectory . DIRECTORY_SEPARATOR . uniqid() . '-git.zip';
 
@@ -56,7 +54,7 @@ class Deploy
 
 		$this->makeDir($checkoutDirectory);
 
-		$success = $this->exec('git archive -o ' . $zipFile . ' ' . $branch . ' && unzip ' . $zipFile . ' -d ' . $checkoutDirectory . ' && rm ' . $zipFile);
+		$success = $this->exec(sprintf('git archive -o %s %s && unzip %s -d %s && rm %s', $zipFile, $branch, $zipFile, $checkoutDirectory, $zipFile));
 
 		chdir($currentDirectory);
 
@@ -64,8 +62,7 @@ class Deploy
 	}
 
 
-	/** @return bool */
-	protected function exec($command, & $stdout = FALSE)
+	protected function exec(string $command, & $stdout = FALSE): bool
 	{
 		exec($command, $output, $return);
 		if ($output && ($stdout !== FALSE)) {
@@ -75,17 +72,16 @@ class Deploy
 	}
 
 
-	protected function gzip($sourcePath, $sourceDir, $targetFile)
+	protected function gzip(string $sourcePath, string $sourceDir, string $targetFile): void
 	{
-		exec('tar -C ' . $sourcePath . ' --force-local -zcvf ' . $targetFile . ' ' . $sourceDir, $output, $return);
+		exec(sprintf('tar -C %s --force-local -zcvf %s %s', $sourcePath, $targetFile, $sourceDir), $output, $return);
 		if ($return !== 0) {
-			throw new \RuntimeException("Can't create tar.gz archive '$targetFile': " . implode("\n", $output));
+			throw new \RuntimeException(sprintf('Can\'t create tar.gz archive \'%s\': %s', $targetFile, implode(PHP_EOL, $output)));
 		}
 	}
 
 
-	/** @return bool */
-	protected function ssh($command, $validate = NULL, & $output = NULL, $host = NULL, $port = 22)
+	protected function ssh(string $command, ?string $validate = NULL, & $output = NULL, ?string $host = NULL, int $port = 22): bool
 	{
 		$output = $this->sshExec($this->sshConnect($host, $port), $command . ';echo "[return_code:$?]"');
 
@@ -93,23 +89,23 @@ class Deploy
 		$output = preg_replace( '/\[return_code:(.*?)\]/', '', $output);
 
 		if ($match[1] !== '0') {
-			$this->log('| SSH error output for command "' . $command . '": ' . $output);
+			$this->log(sprintf('| SSH error output for command "%s": %s', $command, $output));
 			return FALSE;
 		}
 
 		if ($validate) {
-			$sucess = strpos($output, $validate) !== FALSE;
-			if (!$sucess) {
-				$this->log('| SSH validation error: "' . $output . '" doesn\'t contains "' . $validate . '"');
+			$success = strpos($output, $validate) !== FALSE;
+			if (!$success) {
+				$this->log(sprintf('| SSH validation error: "%s" doesn\'t contains "%s"', $output, $validate));
 			}
-			return $sucess;
+			return $success;
 		}
 
 		return TRUE;
 	}
 
 
-	protected function scp($localFile, $remoteDirectory, $host = NULL, $port = 22)
+	protected function scp(string $localFile, string $remoteDirectory, ?string $host = NULL, int $port = 22): bool
 	{
 		$remoteDirectory = rtrim($remoteDirectory, '/');
 
@@ -130,7 +126,7 @@ class Deploy
 	}
 
 
-	protected function httpRequest($url, $validate = NULL)
+	protected function httpRequest(string $url, ?string $validate = NULL): bool
 	{
 		$curl = curl_init($url);
 		curl_setopt($curl, CURLOPT_HEADER, FALSE);
@@ -148,19 +144,19 @@ class Deploy
 	}
 
 
-	protected function error($message = NULL)
+	protected function error(?string $message = NULL): void
 	{
 		throw new \RuntimeException($message);
 	}
 
 
-	protected function log($message, $newLine = TRUE)
+	protected function log(string $message, bool $newLine = TRUE): string
 	{
-		echo $message . ($newLine ? "\n" : '');
+		echo $message . ($newLine ? PHP_EOL : '');
 	}
 
 
-	private function sshConnect($host, $port = 22)
+	private function sshConnect(string $host, int $port = 22)
 	{
 		if ($host === NULL) {
 			$host = $this->environment['ssh']['server'];
@@ -168,12 +164,12 @@ class Deploy
 
 		$credentials = $this->environment['ssh'];
 
-		$key = $credentials['username'] . '@' . $host . ':' . $port;
+		$key = sprintf('%s@%s:%d', $credentials['username'], $host, $port);
 
 		if (!isset($this->sshConnections[$key])) {
 			$connection = ssh2_connect($host, $port, ['hostkey' => 'ssh-rsa']);
 			if ($connection === FALSE) {
-				throw new \RuntimeException('SSH can\'t connet to host "' . $host . '":' . $port . '.');
+				throw new \RuntimeException(sprintf('SSH can\'t connect to host "%s":%d.', $host, $port));
 			}
 
 			if (isset($credentials['public_key'])) {
@@ -191,7 +187,7 @@ class Deploy
 	}
 
 
-	private function sshExec($connection, $command)
+	private function sshExec($connection, string $command)
 	{
 		$stream = ssh2_exec($connection, $command);
 		stream_set_blocking($stream, TRUE);

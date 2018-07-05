@@ -1,7 +1,7 @@
-Forrest79/PhpDeploy
+Forrest79/DeployPhp
 ===================
 
-[![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://github.com/forrest79/PhpDeploy/blob/master/license.md)
+[![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://github.com/forrest79/DeployPhp/blob/master/license.md)
 
 Simple assets builder and application deploy helper.
 
@@ -9,7 +9,7 @@ Simple assets builder and application deploy helper.
 Requirements
 ------------
 
-Forrest79/PhpDeploy requires PHP 5.6 or higher and is primarily designed for using with Nette Framework.
+Forrest79/DeployPhp requires PHP 7.1 or higher and is primarily designed for using with Nette Framework.
 
 - [Nette Framework](https://github.com/nette/nette)
 
@@ -17,7 +17,7 @@ Forrest79/PhpDeploy requires PHP 5.6 or higher and is primarily designed for usi
 Installation
 ------------
 
-* Install Forrest79/PhpDeploy to your project using [Composer](http://getcomposer.org/). Add this to your composer.json (there is no Composer package yet):
+* Install Forrest79/DeployPhp to your project using [Composer](http://getcomposer.org/). Add this to your composer.json (there is no Composer package yet):
 
 ```json
 {
@@ -27,7 +27,7 @@ Installation
     "repositories": [
         {
             "type": "vcs",
-            "url": "https://github.com/forrest79/PhpDeploy.git"
+            "url": "https://github.com/forrest79/DeployPhp.git"
         }
     ]
 }
@@ -47,12 +47,13 @@ Documentation
 
 This is simple assets builder. Currently supports copying files, compiling and minifying [less](http://lesscss.org/) files and JavaScript files and in debug environment also generating map files.
 
-Using is very simple. Just create new instance `Forrest79\PhpDeploy\Assets` class and pass configuraion array to constructor. `key` is file or directory to process and `value` can be simple `PhpDeploy\Assets::COPY` which tells to copy this file/directory from source to destination as is or another `array` with items:
+Using is very simple. Just create new instance `Forrest79\DeployPhp\Assets` class and pass configuraion array to constructor. `key` is directory to process (for ```DeployPhp\Assets::COPY```) or target file (for ```DeployPhp\Assets::JS``` or ```DeployPhp\Assets::LESS```) or directory (for ```DeployPhp\Assets::SASS```) for source data and `value` can be simple `DeployPhp\Assets::COPY` which tells to copy this file/directory from source to destination as is or another `array` with items:
 
-- required `type` - with value `PhpDeploy\Assets::COPY` to copy file/directory or `PhpDeploy\Assets::LESS` to compile and minify less to CSS or `PhpDeploy\Assets::JS` to concatenate and minify JavaScripts
-- optional `env` - if missing, this item is proccess for debug and production environment or you can specify concrete environment `PhpDeploy\Assets::DEBUG` or `PhpDeploy\Assets::PRODUCTION`
-- required `file` for `type => PhpDeploy\Assets::LESS` - with source file to compile and minify
-- required `files` for `type => PhpDeploy\Assets::JS` - with source files to concatenate and minify
+- required `type` - with value `DeployPhp\Assets::COPY` to copy file/directory or `DeployPhp\Assets::LESS` to compile and minify less to CSS or `DeployPhp\Assets::JS` to concatenate and minify JavaScripts
+- optional `env` - if missing, this item is proccess for debug and production environment or you can specify concrete environment `DeployPhp\Assets::DEBUG` or `DeployPhp\Assets::PRODUCTION`
+- required `file` for `type => DeployPhp\Assets::LESS` - with source file to compile and minify
+- required `file` for `type => DeployPhp\Assets::SASS` - with source file to compile and minify
+- required `files` for `type => DeployPhp\Assets::JS` - with source files to concatenate and minify
 
 To build assets you need first call `setup($configNeon, $sourceDirectory, $destinationDirectory)` method.
 
@@ -75,30 +76,33 @@ parameters:
 In `deploy/assets.php`:
 
 ```php
-use Forrest79\PhpDeploy;
+use Forrest79\DeployPhp;
 
 require __DIR__ . '/vendor/autoload.php';
 
-
-return (new PhpDeploy\Assets([
-    'images' => PhpDeploy\Assets::COPY,
-    'fonts' => PhpDeploy\Assets::COPY,
-    'css/styles.css' => [
-        'type' => PhpDeploy\Assets::LESS,
+return (new DeployPhp\Assets([
+    'images' => DeployPhp\Assets::COPY,
+    'fonts' => DeployPhp\Assets::COPY,
+    'css/styles.css' => [ // target file
+        'type' => DeployPhp\Assets::LESS,
         'file' => 'css/main.less',
     ],
-    'js/scripts.js' => [
-        'type' => PhpDeploy\Assets::JS,
+    'css/styles' => [ // target directory, main.css will be created here
+        'type' => DeployPhp\Assets::SASS,
+        'file' => 'css/main.sass',
+    ],
+    'js/scripts.js' => [ // target file
+        'type' => DeployPhp\Assets::JS,
         'files' => [
             'js/bootstrap.js',
             'js/modernizr-custom.js',
             'js/web.js',
         ],
     ],
-    'js/jquery.min.js' => PhpDeploy\Assets::COPY,
+    'js/jquery.min.js' => DeployPhp\Assets::COPY,
     'js/jquery.min.map' => [
-        'type' => PhpDeploy\Assets::COPY,
-        'env' => PhpDeploy\Assets::DEBUG,
+        'type' => DeployPhp\Assets::COPY,
+        'env' => DeployPhp\Assets::DEBUG,
     ],
 ], (file_exists($assetsLocalFile = (__DIR__ . '/assets.local.php'))) ? require $assetsLocalFile : []));
 ```
@@ -119,7 +123,7 @@ $configurator->addConfig($assetsConfigFile = __DIR__ . '/config/config.assets.ne
 $configurator->addConfig(__DIR__ . '/config/config.local.neon');
 
 if ($configurator->isDebugMode()) {
-    /** @var Forrest79\PhpDeploy\Assets $assets */
+    /** @var Forrest79\DeployPhp\Assets $assets */
     $assets = require __DIR__ . '/../deploy/assets.php';
     $assets
         ->setup($assetsConfigFile, __DIR__ . '/assets', __DIR__ . '/../www/assets')
@@ -134,7 +138,7 @@ In debug mode is hash calculated from every assets files timestamp - creating ha
 When building application:
 
 ```php
-/** @var PhpDeploy\Assets $assets */
+/** @var DeployPhp\Assets $assets */
 $assets = require __DIR__ . '/assets.php';
 $assets
     ->setup($releaseBuildDirectory . '/app/config/config.assets.neon', $releaseBuildDirectory . '/app/assets', $releaseBuildDirectory . '/www/assets')
@@ -151,13 +155,12 @@ Contains just some helper methods to checkout from GIT, copy files via SCP a run
 #### Example
 
 ```php
-use Forrest79\PhpDeploy;
+use Forrest79\DeployPhp;
 
 require __DIR__ . '/../vendor/autoload.php'; // with required Nette components
 require __DIR__ . '/vendor/autoload.php';
 
-
-class Deploy extends PhpDeploy\Deploy
+class Deploy extends DeployPhp\Deploy
 {
     /** @var array */
     protected $config = [
@@ -225,7 +228,7 @@ class Deploy extends PhpDeploy\Deploy
         $this->log(' ...OK');
 
         $this->log('     -> building assets', FALSE);
-        /** @var PhpDeploy\Assets $assets */
+        /** @var DeployPhp\Assets $assets */
         $assets = require __DIR__ . '/assets.php';
         $assets
             ->setup($releaseBuildDirectory . '/app/config/config.assets.neon', $releaseBuildDirectory . '/app/assets', $releaseBuildDirectory . '/www/assets')

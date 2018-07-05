@@ -1,7 +1,7 @@
 {
-	"name": "forrest79/php-deploy",
-	"description": "Simple assets builder and deploy application helper.",
-	"keywords": ["php", "deploy"],
+	"name": "forrest79/deploy-php",
+	"description": "Simple assets builder and deploy application helper for PHP projects.",
+	"keywords": ["deploy", "php"],
 	"type": "library",
 	"license": "BSD License",
 	"authors": [
@@ -11,11 +11,15 @@
 		}
 	],
 	"require": {
-		"php": ">=5.6.0"
+		"php": ">=7.1.0"
+	},
+	"require-dev": {
+		"nette/neon": "^2.4",
+		"nette/utils": "^2.4"
 	},
 	"autoload": {
-		"psr-0": {
-			"Forrest79\\PhpDeploy\\": "src/"
+		"psr-4": {
+			"Forrest79\\DeployPhp\\": "src/"
 		}
 	}
 }
