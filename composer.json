@@ -14,7 +14,6 @@
 		"php": ">=7.1.0"
 	},
 	"require-dev": {
-		"nette/neon": "^2.4",
 		"nette/utils": "^2.4"
 	},
 	"autoload": {

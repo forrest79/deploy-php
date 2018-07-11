@@ -2,7 +2,6 @@
 
 namespace Forrest79\DeployPhp;
 
-use Nette\Neon;
 use Nette\Utils;
 
 class Assets
@@ -17,6 +16,12 @@ class Assets
 
 	/** @var array */
 	private $config;
+
+	/** @var callable function (string $configFile): ?string */
+	private $readHash;
+
+	/** @var callable function (string $configFile, string $hash): void */
+	private $writeHash;
 
 	/** @var bool */
 	private $setup = FALSE;
@@ -34,9 +39,11 @@ class Assets
 	private $configFile;
 
 
-	public function __construct(array $config, array $localConfig = [])
+	public function __construct(array $config, callable $readHash, callable $writeHash, array $localConfig = [])
 	{
 		$this->config = $config;
+		$this->readHash = $readHash;
+		$this->writeHash = $writeHash;
 
 		if (isset($localConfig['localSourceDirectory'])) {
 			$this->localSourceDirectory = rtrim($localConfig['localSourceDirectory'], '\\/');
@@ -62,7 +69,7 @@ class Assets
 			throw new \RuntimeException('Run setup() first.');
 		}
 
-		$oldHash = $this->readNeon();
+		$oldHash = call_user_func($this->readHash, $this->configFile);
 
 		if (!file_exists($this->sourceDirectory)) {
 			throw new \RuntimeException('Assets source directory doesn\'t exists.');
@@ -79,7 +86,7 @@ class Assets
 
 		if ($oldHash !== $newHash) {
 			$this->buildAssets(self::DEBUG);
-			$this->writeNeon($newHash);
+			call_user_func($this->writeHash, $this->configFile, $newHash);
 		}
 	}
 
@@ -103,7 +110,7 @@ class Assets
 			}
 		}
 
-		$this->writeNeon(md5($contents));
+		call_user_func($this->writeHash, $this->configFile, md5($contents));
 	}
 
 
@@ -235,27 +242,6 @@ class Assets
 			$mapFile = $destinationFile . '.map';
 			file_put_contents($mapFile, strtr(file_get_contents($mapFile), $mapSources));
 		}
-	}
-
-
-	private function readNeon(): ?string
-	{
-		if (!file_exists($this->configFile)) {
-			return NULL;
-		}
-
-		$data = Neon\Neon::decode(file_get_contents($this->configFile));
-		if (!isset($data['parameters']['assets']['hash'])) {
-			return NULL;
-		}
-
-		return $data['parameters']['assets']['hash'];
-	}
-
-
-	private function writeNeon(string $hash): void
-	{
-		file_put_contents($this->configFile, "parameters:\n\tassets:\n\t\thash: $hash\n");
 	}
 
 }

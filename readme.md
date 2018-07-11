@@ -45,15 +45,19 @@ Documentation
 
 ### Assets
 
-This is simple assets builder. Currently supports copying files, compiling and minifying [less](http://lesscss.org/) files and JavaScript files and in debug environment also generating map files.
+This is simple assets builder. Currently supports copying files, compiling and minifying [less](http://lesscss.org/) files, [sass](https://sass-lang.com/) files and JavaScript files and in debug environment also generating map files.
 
-Using is very simple. Just create new instance `Forrest79\DeployPhp\Assets` class and pass configuraion array to constructor. `key` is directory to process (for ```DeployPhp\Assets::COPY```) or target file (for ```DeployPhp\Assets::JS``` or ```DeployPhp\Assets::LESS```) or directory (for ```DeployPhp\Assets::SASS```) for source data and `value` can be simple `DeployPhp\Assets::COPY` which tells to copy this file/directory from source to destination as is or another `array` with items:
+Using is very simple. Just create new instance `Forrest79\DeployPhp\Assets` class and pass configuration array to constructor. `key` is directory to process (for ```DeployPhp\Assets::COPY```) or target file (for ```DeployPhp\Assets::JS``` or ```DeployPhp\Assets::LESS```) or directory (for ```DeployPhp\Assets::SASS```) for source data and `value` can be simple `DeployPhp\Assets::COPY` which tells to copy this file/directory from source to destination as is or another `array` with items:
 
 - required `type` - with value `DeployPhp\Assets::COPY` to copy file/directory or `DeployPhp\Assets::LESS` to compile and minify less to CSS or `DeployPhp\Assets::JS` to concatenate and minify JavaScripts
 - optional `env` - if missing, this item is proccess for debug and production environment or you can specify concrete environment `DeployPhp\Assets::DEBUG` or `DeployPhp\Assets::PRODUCTION`
 - required `file` for `type => DeployPhp\Assets::LESS` - with source file to compile and minify
 - required `file` for `type => DeployPhp\Assets::SASS` - with source file to compile and minify
 - required `files` for `type => DeployPhp\Assets::JS` - with source files to concatenate and minify
+
+Next two parameters are callable function, first is for reading hash from file and second is write hash to file. In example is shown, how you can write it to neon and use it with Nette DI.
+
+Last (fourth) parameter is optional and define array with optional settings. More about this is under example.
 
 To build assets you need first call `setup($configNeon, $sourceDirectory, $destinationDirectory)` method.
 
@@ -81,30 +85,43 @@ use Forrest79\DeployPhp;
 require __DIR__ . '/vendor/autoload.php';
 
 return (new DeployPhp\Assets([
-    'images' => DeployPhp\Assets::COPY,
-    'fonts' => DeployPhp\Assets::COPY,
-    'css/styles.css' => [ // target file
-        'type' => DeployPhp\Assets::LESS,
-        'file' => 'css/main.less',
-    ],
-    'css/styles' => [ // target directory, main.css will be created here
-        'type' => DeployPhp\Assets::SASS,
-        'file' => 'css/main.sass',
-    ],
-    'js/scripts.js' => [ // target file
-        'type' => DeployPhp\Assets::JS,
-        'files' => [
-            'js/bootstrap.js',
-            'js/modernizr-custom.js',
-            'js/web.js',
+        'images' => DeployPhp\Assets::COPY,
+        'fonts' => DeployPhp\Assets::COPY,
+        'css/styles.css' => [ // target file
+            'type' => DeployPhp\Assets::LESS,
+            'file' => 'css/main.less',
         ],
-    ],
-    'js/jquery.min.js' => DeployPhp\Assets::COPY,
-    'js/jquery.min.map' => [
-        'type' => DeployPhp\Assets::COPY,
-        'env' => DeployPhp\Assets::DEBUG,
-    ],
-], (file_exists($assetsLocalFile = (__DIR__ . '/assets.local.php'))) ? require $assetsLocalFile : []));
+        'css/styles' => [ // target directory, main.css will be created here
+            'type' => DeployPhp\Assets::SASS,
+            'file' => 'css/main.sass',
+        ],
+        'js/scripts.js' => [ // target file
+            'type' => DeployPhp\Assets::JS,
+            'files' => [
+                'js/bootstrap.js',
+                'js/modernizr-custom.js',
+                'js/web.js',
+            ],
+        ],
+        'js/jquery.min.js' => DeployPhp\Assets::COPY,
+        'js/jquery.min.map' => [
+            'type' => DeployPhp\Assets::COPY,
+            'env' => DeployPhp\Assets::DEBUG,
+        ],
+    ], function (string $configFile): ?string {
+        if (!file_exists($configFile)) {
+            return NULL;
+        }
+
+        $data = Neon\Neon::decode(file_get_contents($configFile));
+        if (!isset($data['assets']['hash'])) {
+            return NULL;
+        }
+
+        return $data['assets']['hash'];
+    }, function (string $configFile, string $hash): void {
+        file_put_contents($configFile, "assets:\n\t\thash: $hash\n");
+    }, (file_exists($assetsLocalFile = (__DIR__ . '/assets.local.php'))) ? require $assetsLocalFile : []));
 ```
 
 In `deploy/assets.local.php` you can define local source assets directory, if you're using some virtual server, where the paths are different from your host paths. This directory will be used for JS and CSS map files to property open source files in browser console:
@@ -134,6 +151,8 @@ $container = $configurator->createContainer();
 ```
 
 In debug mode is hash calculated from every assets files timestamp - creating hash is fast (if you change file or add/remove some file, hash is changed and assets are automatically rebuilt before request is performed).
+
+In Nette you need to define you own Assets extension, that will read hash from ```assets.hash``` and with some sort of service, you can use it in your application.
 
 When building application:
 
