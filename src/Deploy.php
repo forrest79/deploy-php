@@ -150,12 +150,17 @@ class Deploy
 	}
 
 
-	protected function log(string $message, bool $newLine = TRUE): string
+	protected function log(string $message, bool $newLine = TRUE): void
 	{
 		echo $message . ($newLine ? PHP_EOL : '');
 	}
 
 
+	/**
+	 * @param string $host
+	 * @param int $port
+	 * @return resource
+	 */
 	private function sshConnect(string $host, int $port = 22)
 	{
 		if ($host === NULL) {
@@ -187,12 +192,86 @@ class Deploy
 	}
 
 
+	/**
+	 * @param resource $connection
+	 * @param string $command
+	 * @return bool|string
+	 */
 	private function sshExec($connection, string $command)
 	{
 		$stream = ssh2_exec($connection, $command);
 		stream_set_blocking($stream, TRUE);
 		$streamOut = ssh2_fetch_stream($stream, SSH2_STREAM_STDIO);
 		return stream_get_contents($streamOut);
+	}
+
+
+	public static function getResponse(): string
+	{
+		return stream_get_line(STDIN, 1024, PHP_EOL);
+	}
+
+
+	/**
+	 * Taken from Symfony/Console.
+	 */
+	public static function getHiddenResponse(): string
+	{
+		if ('\\' === DIRECTORY_SEPARATOR) {
+			return rtrim(shell_exec(__DIR__ . '/../bin/hiddeninput.exe'));
+		}
+
+		if (self::hasSttyAvailable()) {
+			$sttyMode = shell_exec('stty -g');
+
+			shell_exec('stty -echo');
+			$value = fgets(STDIN, 4096);
+			shell_exec(sprintf('stty %s', $sttyMode));
+
+			if ($value === FALSE) {
+				throw new \RuntimeException('Hidden response aborted.');
+			}
+
+			$value = trim($value);
+
+			return $value;
+		}
+
+		if (($shell = self::getShell()) !== FALSE) {
+			$readCmd = 'csh' === $shell ? 'set mypassword = $<' : 'read -r mypassword';
+			$command = sprintf("/usr/bin/env %s -c 'stty -echo; %s; stty echo; echo \$mypassword'", $shell, $readCmd);
+			$value = rtrim(shell_exec($command));
+
+			return $value;
+		}
+
+		throw new \RuntimeException('Unable to hide the response.');
+	}
+
+
+	private static function getShell()
+	{
+		$shell = FALSE;
+
+		if (file_exists('/usr/bin/env')) {
+			// handle other OSs with bash/zsh/ksh/csh if available to hide the answer
+			$test = "/usr/bin/env %s -c 'echo OK' 2> /dev/null";
+			foreach (['bash', 'zsh', 'ksh', 'csh'] as $sh) {
+				if (rtrim(shell_exec(sprintf($test, $sh))) === 'OK') {
+					$shell = $sh;
+					break;
+				}
+			}
+		}
+
+		return $shell;
+	}
+
+
+	private static function hasSttyAvailable(): bool
+	{
+		exec('stty 2>&1', $output, $exitcode);
+		return 0 === $exitcode;
 	}
 
 }
