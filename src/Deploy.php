@@ -161,7 +161,7 @@ class Deploy
 	 * @param int $port
 	 * @return resource
 	 */
-	private function sshConnect(string $host, int $port = 22)
+	private function sshConnect(?string $host, int $port = 22)
 	{
 		if ($host === NULL) {
 			$host = $this->environment['ssh']['server'];
