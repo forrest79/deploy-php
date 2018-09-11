@@ -119,7 +119,7 @@ class Deploy
 			$file = file_get_contents($localFile);
 			$success = fwrite($stream, $file);
 			fclose($stream);
-			return $success;
+			return (bool) $success;
 		}
 
 		return FALSE;
