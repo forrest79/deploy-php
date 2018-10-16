@@ -23,9 +23,6 @@ class Assets
 	/** @var callable function (string $configFile, string $hash): void */
 	private $writeHash;
 
-	/** @var bool */
-	private $setup = FALSE;
-
 	/** @var string */
 	private $sourceDirectory;
 
@@ -39,8 +36,10 @@ class Assets
 	private $configFile;
 
 
-	public function __construct(array $config, callable $readHash, callable $writeHash, array $localConfig = [])
+	public function __construct(string $sourceDirectory, array $config, callable $readHash, callable $writeHash, array $localConfig = [])
 	{
+		$this->sourceDirectory = rtrim($sourceDirectory, '\\/');
+
 		$this->config = $config;
 		$this->readHash = $readHash;
 		$this->writeHash = $writeHash;
@@ -51,29 +50,11 @@ class Assets
 	}
 
 
-	public function setup(string $configFile, string $sourceDirectory, string $destinationDirectory): self
+	public function buildDebug(string $configFile, string $destinationDirectory): void
 	{
-		$this->configFile = $configFile;
-		$this->sourceDirectory = rtrim($sourceDirectory, '\\/');
-		$this->destinationDirectory = rtrim($destinationDirectory, '\\/');
-
-		$this->setup = TRUE;
-
-		return $this;
-	}
-
-
-	public function buildDebug(): void
-	{
-		if ($this->setup === FALSE) {
-			throw new \RuntimeException('Run setup() first.');
-		}
+		$this->setup($configFile, $destinationDirectory);
 
 		$oldHash = call_user_func($this->readHash, $this->configFile);
-
-		if (!file_exists($this->sourceDirectory)) {
-			throw new \RuntimeException('Assets source directory doesn\'t exists.');
-		}
 
 		$files = [];
 		foreach ($iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($this->sourceDirectory, \RecursiveDirectoryIterator::SKIP_DOTS)) as $item) {
@@ -82,7 +63,7 @@ class Assets
 			}
 		}
 
-		$newHash = md5(serialize($files));
+		$newHash = md5(serialize($this->config) . serialize($files));
 
 		if ($oldHash !== $newHash) {
 			$this->buildAssets(self::DEBUG);
@@ -91,15 +72,9 @@ class Assets
 	}
 
 
-	public function buildProduction(): void
+	public function buildProduction(string $configFile, string $destinationDirectory): void
 	{
-		if ($this->setup === FALSE) {
-			throw new \RuntimeException('Run setup() first.');
-		}
-
-		if (!file_exists($this->sourceDirectory)) {
-			throw new \RuntimeException('Assets source directory doen\'t exists.');
-		}
+		$this->setup($configFile, $destinationDirectory);
 
 		$this->buildAssets(self::PRODUCTION);
 
@@ -111,6 +86,17 @@ class Assets
 		}
 
 		call_user_func($this->writeHash, $this->configFile, md5($contents));
+	}
+
+
+	private function setup(string $configFile, string $destinationDirectory): void
+	{
+		if (!file_exists($this->sourceDirectory)) {
+			throw new \RuntimeException('Assets source directory doesn\'t exists.');
+		}
+
+		$this->configFile = $configFile;
+		$this->destinationDirectory = rtrim($destinationDirectory, '\\/');
 	}
 
 

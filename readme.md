@@ -3,15 +3,13 @@ Forrest79/DeployPhp
 
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://github.com/forrest79/DeployPhp/blob/master/license.md)
 
-Simple assets builder and application deploy helper.
+Simple assets builder and application deploy helper for PHP projects.
 
 
 Requirements
 ------------
 
-Forrest79/DeployPhp requires PHP 7.1 or higher and is primarily designed for using with Nette Framework.
-
-- [Nette Framework](https://github.com/nette/nette)
+Forrest79/DeployPhp requires PHP 7.1 or higher.
 
 
 Installation
@@ -47,7 +45,7 @@ Documentation
 
 This is simple assets builder. Currently supports copying files, compiling and minifying [less](http://lesscss.org/) files, [sass](https://sass-lang.com/) files and JavaScript files and in debug environment also generating map files.
 
-Using is very simple. Just create new instance `Forrest79\DeployPhp\Assets` class and pass configuration array to constructor. `key` is directory to process (for ```DeployPhp\Assets::COPY```) or target file (for ```DeployPhp\Assets::JS``` or ```DeployPhp\Assets::LESS```) or directory (for ```DeployPhp\Assets::SASS```) for source data and `value` can be simple `DeployPhp\Assets::COPY` which tells to copy this file/directory from source to destination as is or another `array` with items:
+Using is very simple. Examples show how this works with [Nette Framework](https://github.com/nette/nette). Just create new instance `Forrest79\DeployPhp\Assets` class and pass assets source directory and configuration array to constructor. `key` is directory to process (for ```DeployPhp\Assets::COPY```) or target file (for ```DeployPhp\Assets::JS``` or ```DeployPhp\Assets::LESS```) or directory (for ```DeployPhp\Assets::SASS```) for source data and `value` can be simple `DeployPhp\Assets::COPY` which tells to copy this file/directory from source to destination as is or another `array` with items:
 
 - required `type` - with value `DeployPhp\Assets::COPY` to copy file/directory or `DeployPhp\Assets::LESS` to compile and minify less to CSS or `DeployPhp\Assets::JS` to concatenate and minify JavaScripts
 - optional `env` - if missing, this item is proccess for debug and production environment or you can specify concrete environment `DeployPhp\Assets::DEBUG` or `DeployPhp\Assets::PRODUCTION`
@@ -59,21 +57,12 @@ Next two parameters are callable function, first is for reading hash from file a
 
 Last (fourth) parameter is optional and define array with optional settings. More about this is under example.
 
-To build assets you need first call `setup($configNeon, $sourceDirectory, $destinationDirectory)` method.
+To build assets you need first call `buildDebug($configNeon, $destinationDirectory)` or `buildProduction($configNeon, $destinationDirectory)` method.
 
-- `$configNeon` neon file where will be stored actual assets hash that you can use in your application
-- `$sourceDirectory` directory with source assets files
+- `$configFile`  file where will be stored actual assets hash that you can use in your application
 - `$destinationDirectory` directory where assets will be built
 
-And finally run `buildDebug()` or `buildProduction()` method. First builds assets only if there was some changed file and creates new hash from all files timestamp, the second builds assets everytime and creates hash from every files content.
-
-Neon file with hash has this structure:
-
-```yml
-parameters:
-    assets:
-        hash: c11a678785091b7f1334c24a4123ee75 # md5 hash (32 characters)
-```
+First builds assets only if there was some changed file and creates new hash from all files timestamp (and also create map files), the second builds assets everytime and creates hash from every files content.
 
 #### Example
 
@@ -84,7 +73,7 @@ use Forrest79\DeployPhp;
 
 require __DIR__ . '/vendor/autoload.php';
 
-return (new DeployPhp\Assets([
+return (new DeployPhp\Assets(__DIR__ . '/assets', [
         'images' => DeployPhp\Assets::COPY,
         'fonts' => DeployPhp\Assets::COPY,
         'css/styles.css' => [ // target file
@@ -121,7 +110,16 @@ return (new DeployPhp\Assets([
         return $data['assets']['hash'];
     }, function (string $configFile, string $hash): void {
         file_put_contents($configFile, "assets:\n\t\thash: $hash\n");
-    }, (file_exists($assetsLocalFile = (__DIR__ . '/assets.local.php'))) ? require $assetsLocalFile : []));
+    }, (file_exists($assetsLocalFile = (__DIR__ . '/assets.local.php'))) ? require $assetsLocalFile : [])
+);
+```
+
+Neon file with hash has this structure:
+
+```yml
+parameters:
+    assets:
+        hash: c11a678785091b7f1334c24a4123ee75 # md5 hash (32 characters)
 ```
 
 In `deploy/assets.local.php` you can define local source assets directory, if you're using some virtual server, where the paths are different from your host paths. This directory will be used for JS and CSS map files to property open source files in browser console:
@@ -136,32 +134,93 @@ In `app/bootstrap.php`:
 
 ```php
 $configurator->addConfig(__DIR__ . '/config/config.neon');
-$configurator->addConfig($assetsConfigFile = __DIR__ . '/config/config.assets.neon');
-$configurator->addConfig(__DIR__ . '/config/config.local.neon');
 
-if ($configurator->isDebugMode()) {
-    /** @var Forrest79\DeployPhp\Assets $assets */
-    $assets = require __DIR__ . '/../deploy/assets.php';
-    $assets
-        ->setup($assetsConfigFile, __DIR__ . '/assets', __DIR__ . '/../www/assets')
-        ->buildDebug();
+if (PHP_SAPI !== 'cli') {
+    $assetsConfigFile = __DIR__ . '/config/config.assets.neon';
+    $configurator->addConfig($assetsConfigFile);
+    if ($configurator->isDebugMode()) {
+        /** @var Forrest79\DeployPhp\Assets $assets */
+        $assets = require __DIR__ . '/../deploy/assets.php';
+        $assets->buildDebug($assetsConfigFile, __DIR__ . '/../www/assets')
+    }
 }
+
+$configurator->addConfig(__DIR__ . '/config/config.local.neon');
 
 $container = $configurator->createContainer();
 ```
 
 In debug mode is hash calculated from every assets files timestamp - creating hash is fast (if you change file or add/remove some file, hash is changed and assets are automatically rebuilt before request is performed).
 
-In Nette you need to define you own Assets extension, that will read hash from ```assets.hash``` and with some sort of service, you can use it in your application.
+In Nette you need to define you own Assets extension, that will read hash from ```assets.hash``` and with some sort of service, you can use it in your application. For example, like this:
+
+```php
+// Service to use in application
+
+namespace App\Assets;
+
+class Assets
+{
+    /** @var string */
+    private $hash;
+
+
+    public function __construct(string $hash)
+    {
+        $this->hash = $hash;
+    }
+
+
+    public function getHash(): string
+    {
+        return $this->hash;
+    }
+
+}
+
+
+// Extension that uses neon structure with hash (just register this as extension in config.neon)
+
+namespace App\Assets\DI;
+
+use App\Assets;
+use Nette\DI\CompilerExtension;
+
+class Extension extends CompilerExtension
+{
+    private $defaults = [
+        'hash' => NULL,
+    ];
+
+
+    public function loadConfiguration()
+    {
+        $builder = $this->getContainerBuilder();
+
+        $config = $this->validateConfig($this->defaults, $this->config);
+
+        $builder->addDefinition($this->prefix('assets'))
+            ->setFactory(Assets\Assets::class, [$config['hash']]);
+    }
+
+}
+```
+
+In your application, you can use hash as query parameter ```styles.css?hash``` or as virtual path in web server, example for nginx, load assets at path ```/assets/hash/styles.css```:
+
+```
+location ~ ^/assets/ {
+    expires 7d;
+    rewrite ^/assets/[a-z0-9]+/(.+)$ /assets/$1 break;
+}
+```
 
 When building application:
 
 ```php
 /** @var DeployPhp\Assets $assets */
 $assets = require __DIR__ . '/assets.php';
-$assets
-    ->setup($releaseBuildDirectory . '/app/config/config.assets.neon', $releaseBuildDirectory . '/app/assets', $releaseBuildDirectory . '/www/assets')
-    ->buildProduction();
+$assets->buildProduction($releaseBuildDirectory . '/app/config/config.assets.neon', $releaseBuildDirectory . '/www/assets')
 ```
 
 Hash is computed from all files content, so hash is changed only when some file content is changed or same file is add/remove (creating hash is slow).
