@@ -33,6 +33,18 @@ class Deploy
 	}
 
 
+	protected function copy(string $source, string $destination): void
+	{
+		Utils\FileSystem::copy($source, $destination);
+	}
+
+
+	protected function move(string $source, string $destination): void
+	{
+		Utils\FileSystem::rename($source, $destination);
+	}
+
+
 	protected function delete(string $path): void
 	{
 		Utils\FileSystem::delete($path);
