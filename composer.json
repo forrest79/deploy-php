@@ -11,10 +11,9 @@
 		}
 	],
 	"require": {
-		"php": ">=7.1.0"
-	},
-	"require-dev": {
-		"nette/utils": "^2.4"
+		"php": ">=7.1.0",
+		"nette/utils": "^2.5",
+		"phpseclib/phpseclib": "^2.0"
 	},
 	"autoload": {
 		"psr-4": {

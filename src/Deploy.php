@@ -3,6 +3,8 @@
 namespace Forrest79\DeployPhp;
 
 use Nette\Utils;
+use phpseclib\Crypt;
+use phpseclib\Net;
 
 class Deploy
 {
@@ -101,14 +103,14 @@ class Deploy
 		$output = preg_replace( '/\[return_code:(.*?)\]/', '', $output);
 
 		if ($match[1] !== '0') {
-			$this->log(sprintf('| SSH error output for command "%s": %s', $command, $output));
+			$this->log(sprintf('!-> SSH error output for command "%s": %s', $command, $output));
 			return FALSE;
 		}
 
 		if ($validate) {
 			$success = strpos($output, $validate) !== FALSE;
 			if (!$success) {
-				$this->log(sprintf('| SSH validation error: "%s" doesn\'t contains "%s"', $output, $validate));
+				$this->log(sprintf('!-> SSH validation error: "%s" doesn\'t contains "%s"', $output, $validate));
 			}
 			return $success;
 		}
@@ -121,20 +123,13 @@ class Deploy
 	{
 		$remoteDirectory = rtrim($remoteDirectory, '/');
 
-		$connection = $this->sshConnect($host, $port);
-		$this->sshExec($connection, 'mkdir -p ' . $remoteDirectory); // create remote directory if doesn't
-		$remoteAbsoluteDirectory = (substr($remoteDirectory, 0, 1) === '/') ? $remoteDirectory : (trim($this->sshExec($connection, 'pwd')) . '/' . $remoteDirectory);
+		$sshConnection = $this->sshConnect($host, $port);
+		$this->sshExec($sshConnection, 'mkdir -p ' . $remoteDirectory); // create remote directory if doesn't
+		$remoteAbsoluteDirectory = (substr($remoteDirectory, 0, 1) === '/') ? $remoteDirectory : (trim($this->sshExec($sshConnection, 'pwd')) . '/' . $remoteDirectory);
 		$remoteFile = $remoteAbsoluteDirectory . '/' . basename($localFile);
 
-		$sftp = ssh2_sftp($connection);
-		if ($stream = fopen("ssh2.sftp://" . intval($sftp) . "/$remoteFile", 'wb')) {
-			$file = file_get_contents($localFile);
-			$success = fwrite($stream, $file);
-			fclose($stream);
-			return (bool) $success;
-		}
-
-		return FALSE;
+		$scp = new Net\SCP($sshConnection);
+		return $scp->put($remoteFile, $localFile, Net\SCP::SOURCE_LOCAL_FILE);
 	}
 
 
@@ -168,12 +163,7 @@ class Deploy
 	}
 
 
-	/**
-	 * @param string $host
-	 * @param int $port
-	 * @return resource
-	 */
-	private function sshConnect(?string $host, int $port = 22)
+	private function sshConnect(?string $host, int $port = 22): Net\SSH2
 	{
 		if ($host === NULL) {
 			$host = $this->environment['ssh']['server'];
@@ -184,37 +174,32 @@ class Deploy
 		$key = sprintf('%s@%s:%d', $credentials['username'], $host, $port);
 
 		if (!isset($this->sshConnections[$key])) {
-			$connection = ssh2_connect($host, $port, ['hostkey' => 'ssh-rsa']);
-			if ($connection === FALSE) {
-				throw new \RuntimeException(sprintf('SSH can\'t connect to host "%s":%d.', $host, $port));
-			}
+			$sshConnection = new Net\SSH2($host);
 
-			if (isset($credentials['public_key'])) {
-				if (!ssh2_auth_pubkey_file($connection, $credentials['username'], $credentials['public_key'], $credentials['private_key'], !empty($credentials['passphrase']) ? $credentials['passphrase'] : NULL)) {
-					throw new \RuntimeException('SSH can\'t authenticate with public key.');
+			if (isset($credentials['private_key'])) {
+				$privateKey = new Crypt\RSA();
+				if (isset($credentials['passphrase']) && $credentials['passphrase']) {
+					$privateKey->setPassword($credentials['passphrase']);
+				}
+				$privateKey->loadKey(file_get_contents($credentials['private_key']));
+
+				if (!$sshConnection->login($credentials['username'], $privateKey)) {
+					throw new \RuntimeException(sprintf('!-> SSH can\'t authenticate with private key "%s"', $credentials['private_key']));
 				}
 			} else {
-				throw new \RuntimeException('Unsupported authentication type for SSH.');
+				throw new \RuntimeException('!-> Unsupported authentication type for SSH.');
 			}
 
-			$this->sshConnections[$key] = $connection;
+			$this->sshConnections[$key] = $sshConnection;
 		}
 
 		return $this->sshConnections[$key];
 	}
 
 
-	/**
-	 * @param resource $connection
-	 * @param string $command
-	 * @return bool|string
-	 */
-	private function sshExec($connection, string $command)
+	private function sshExec(Net\SSH2 $sshConnection, string $command): string
 	{
-		$stream = ssh2_exec($connection, $command);
-		stream_set_blocking($stream, TRUE);
-		$streamOut = ssh2_fetch_stream($stream, SSH2_STREAM_STDIO);
-		return stream_get_contents($streamOut);
+		return $sshConnection->exec($command);
 	}
 
 
