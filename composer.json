@@ -3,7 +3,7 @@
 	"description": "Simple assets builder and deploy application helper for PHP projects.",
 	"keywords": ["deploy", "php"],
 	"type": "library",
-	"license": "BSD License",
+	"license": "BSD-3-Clause",
 	"authors": [
 		{
 			"name": "Jakub Trmota",
