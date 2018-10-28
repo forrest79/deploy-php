@@ -232,7 +232,6 @@ class Deploy extends DeployPhp\Deploy
                 'server' => 'ssh.site.com',
                 'directory' => '/var/www/site.com',
                 'username' => 'forrest79',
-                'public_key' => 'C:\\Certificates\\certificate.pub',
                 'private_key' => 'C:\\Certificates\\certificate',
                 'passphrase' => NULL,
             ],
