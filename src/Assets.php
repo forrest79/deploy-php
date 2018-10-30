@@ -35,6 +35,12 @@ class Assets
 	/** @var string */
 	private $configFile;
 
+	/** @var string */
+	private $lockFile;
+
+	/** @var resource */
+	private $lockHandle;
+
 
 	public function __construct(string $sourceDirectory, array $config, callable $readHash, callable $writeHash, array $localConfig = [])
 	{
@@ -47,20 +53,25 @@ class Assets
 		if (isset($localConfig['localSourceDirectory'])) {
 			$this->localSourceDirectory = rtrim($localConfig['localSourceDirectory'], '\\/');
 		}
+
+		$this->lockFile = $this->sourceDirectory . DIRECTORY_SEPARATOR . 'assets.lock';
 	}
 
 
 	public function buildDebug(string $configFile, string $destinationDirectory): void
 	{
+		$lockFile = $this->lock();
+
 		$this->setup($configFile, $destinationDirectory);
 
 		$oldHash = call_user_func($this->readHash, $this->configFile);
 
 		$files = [];
 		foreach ($iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($this->sourceDirectory, \RecursiveDirectoryIterator::SKIP_DOTS)) as $item) {
-			if (!$item->isDir()) {
-				$files[$item->getPathname()] = $item->getMTime();
+			if ($item->isDir() || (realpath($item->getPathname()) === $lockFile)) {
+				continue;
 			}
+			$files[$item->getPathname()] = $item->getMTime();
 		}
 
 		$newHash = md5(serialize($this->config) . serialize($files));
@@ -69,23 +80,30 @@ class Assets
 			$this->buildAssets(self::DEBUG);
 			call_user_func($this->writeHash, $this->configFile, $newHash);
 		}
+
+		$this->unlock();
 	}
 
 
 	public function buildProduction(string $configFile, string $destinationDirectory): void
 	{
+		$lockFile = $this->lock();
+
 		$this->setup($configFile, $destinationDirectory);
 
 		$this->buildAssets(self::PRODUCTION);
 
 		$contents = '';
 		foreach ($iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($this->sourceDirectory, \RecursiveDirectoryIterator::SKIP_DOTS)) as $item) {
-			if (!$item->isDir()) {
-				$contents .= file_get_contents($item->getPathname());
+			if ($item->isDir() || (realpath($item->getPathname()) === $lockFile)) {
+				continue;
 			}
+			$contents .= file_get_contents($item->getPathname());
 		}
 
 		call_user_func($this->writeHash, $this->configFile, md5($contents));
+
+		$this->unlock();
 	}
 
 
@@ -228,6 +246,28 @@ class Assets
 			$mapFile = $destinationFile . '.map';
 			file_put_contents($mapFile, strtr(file_get_contents($mapFile), $mapSources));
 		}
+	}
+
+
+	private function lock(): string
+	{
+		$handle = fopen($this->lockFile, 'c+');
+		if (!$handle) {
+			throw new \RuntimeException(sprintf('Unable to create file \'%s\' %s', $this->lockFile, error_get_last()['message']));
+		} elseif (!flock($handle, LOCK_EX)) {
+			throw new \RuntimeException(sprintf('Unable to acquire exclusive lock on \'%s\' %s', $this->lockFile, error_get_last()['message']));
+		}
+		$this->lockHandle = $handle;
+
+		return realpath($this->lockFile);
+	}
+
+
+	private function unlock(): void
+	{
+		flock($this->lockHandle, LOCK_UN);
+		fclose($this->lockHandle);
+		unlink($this->lockFile);
 	}
 
 }
