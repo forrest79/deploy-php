@@ -251,10 +251,10 @@ class Assets
 
 	private function lock(): string
 	{
-		$handle = fopen($this->lockFile, 'c+');
+		$handle = @fopen($this->lockFile, 'c+'); // intentionally @
 		if (!$handle) {
 			throw new \RuntimeException(sprintf('Unable to create file \'%s\' %s', $this->lockFile, error_get_last()['message']));
-		} elseif (!flock($handle, LOCK_EX)) {
+		} elseif (!@flock($handle, LOCK_EX)) { // intentionally @
 			throw new \RuntimeException(sprintf('Unable to acquire exclusive lock on \'%s\' %s', $this->lockFile, error_get_last()['message']));
 		}
 		$this->lockHandle = $handle;
@@ -265,9 +265,9 @@ class Assets
 
 	private function unlock(): void
 	{
-		flock($this->lockHandle, LOCK_UN);
-		fclose($this->lockHandle);
-		unlink($this->lockFile);
+		@flock($this->lockHandle, LOCK_UN); // intentionally @
+		@fclose($this->lockHandle); // intentionally @
+		@unlink($this->lockFile); // intentionally @
 	}
 
 }
