@@ -29,12 +29,28 @@ Documentation
 
 This is simple assets builder. Currently supports copying files, compiling and minifying [less](http://lesscss.org/) files, [sass](https://sass-lang.com/) files and JavaScript files and in debug environment also generating map files.
 
+For compiling and minifying is required `node.js` with installed `npm` packages `less`, `node-sass` or `uglify-js`. In Debian or Ubuntu, you can do it like this:
+
+```bash
+curl -sL https://deb.nodesource.com/setup_10.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# LESS compiler
+sudo npm install -g less
+
+# SASS compiler
+sudo npm install -g --unsafe-perm node-sass
+
+# JS compiler
+sudo npm install -g uglify-js
+```
+
 Using is very simple. Examples show how this works with [Nette Framework](https://github.com/nette/nette). Just create new instance `Forrest79\DeployPhp\Assets` class and pass assets source directory and configuration array to constructor. `key` is directory to process (for ```DeployPhp\Assets::COPY```) or target file (for ```DeployPhp\Assets::JS``` or ```DeployPhp\Assets::LESS```) or directory (for ```DeployPhp\Assets::SASS```) for source data and `value` can be simple `DeployPhp\Assets::COPY` which tells to copy this file/directory from source to destination as is or another `array` with items:
 
 - required `type` - with value `DeployPhp\Assets::COPY` to copy file/directory or `DeployPhp\Assets::LESS` to compile and minify less to CSS or `DeployPhp\Assets::JS` to concatenate and minify JavaScripts
 - optional `env` - if missing, this item is proccess for debug and production environment or you can specify concrete environment `DeployPhp\Assets::DEBUG` or `DeployPhp\Assets::PRODUCTION`
 - required `file` for `type => DeployPhp\Assets::LESS` - with source file to compile and minify
-- required `file` for `type => DeployPhp\Assets::SASS` - with source file to compile and minify
+- required `file` or `files` for `type => DeployPhp\Assets::SASS` - with source file or files to compile and minify
 - required `files` for `type => DeployPhp\Assets::JS` - with source files to concatenate and minify
 
 Next two parameters are callable function, first is for reading hash from file and second is write hash to file. In example is shown, how you can write it to neon and use it with Nette DI.
@@ -67,6 +83,13 @@ return (new DeployPhp\Assets(__DIR__ . '/assets', [
         'css/styles' => [ // target directory, main.css will be created here
             'type' => DeployPhp\Assets::SASS,
             'file' => 'css/main.sass',
+        ],
+        'css/many-styles' => [ // target directory, main.css and print.css will be created here
+            'type' => DeployPhp\Assets::SASS,
+            'files' => [
+                'css/main.sass',
+                'css/print.sass',
+            ]
         ],
         'js/scripts.js' => [ // target file
             'type' => DeployPhp\Assets::JS,

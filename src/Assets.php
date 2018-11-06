@@ -150,10 +150,12 @@ class Assets
 					break;
 
 				case self::SASS :
-					if (!isset($data['file'])) {
-						throw new \InvalidArgumentException(sprintf('No file defined for \'%s\'.', $path));
+					if (!isset($data['file']) && !isset($data['files'])) {
+						throw new \InvalidArgumentException(sprintf('No file or files defined for \'%s\'.', $path));
 					}
-					$this->compilesSass($data['file'], $path, $isDebug);
+					foreach (isset($data['files']) ? $data['files'] : [$data['file']] as $file) {
+						$this->compilesSass($file, $path, $isDebug);
+					}
 					break;
 
 				case self::JS :
