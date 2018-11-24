@@ -1,5 +1,4 @@
-Forrest79/DeployPhp
-===================
+# Forrest79/DeployPhp
 
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://github.com/forrest79/DeployPhp/blob/master/license.md)
 [![Build Status](https://travis-ci.org/forrest79/DeployPhp.svg?branch=master)](https://travis-ci.org/forrest79/DeployPhp)
@@ -7,14 +6,12 @@ Forrest79/DeployPhp
 Simple assets builder and application deploy helper for PHP projects.
 
 
-Requirements
-------------
+## Requirements
 
 Forrest79/DeployPhp requires PHP 7.1 or higher.
 
 
-Installation
-------------
+## Installation
 
 The recommended way to install Forrest79/DeployPhp is through Composer:
 
@@ -23,8 +20,7 @@ composer require forrest79/deploy-php
 ```
 
 
-Documentation
-------------
+## Documentation
 
 ### Assets
 
