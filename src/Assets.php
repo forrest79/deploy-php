@@ -110,7 +110,7 @@ class Assets
 	private function setup(string $configFile, string $destinationDirectory): void
 	{
 		if (!file_exists($this->sourceDirectory)) {
-			throw new \RuntimeException('Assets source directory doesn\'t exists.');
+			throw new Exceptions\AssetsException('Assets source directory doesn\'t exists.');
 		}
 
 		$this->configFile = $configFile;
@@ -178,7 +178,7 @@ class Assets
 
 		$mapCommand = '';
 		if ($createMap === TRUE) {
-			$sourceMapDirectory = dirname($this->localSourceDirectory ? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $sourceFile) : $sourceFile);
+			$sourceMapDirectory = dirname($this->localSourceDirectory !== NULL ? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $sourceFile) : $sourceFile);
 			$mapCommand = sprintf('--source-map --source-map-rootpath=file:///%s ', $sourceMapDirectory);
 		}
 
@@ -187,7 +187,7 @@ class Assets
 		exec($command, $output, $returnVal);
 
 		if ($returnVal !== 0) {
-			throw new \RuntimeException(sprintf('Error while compiling less (%s): %s', $command, implode("\n", $output)));
+			throw new Exceptions\AssetsException(sprintf('Error while compiling less (%s): %s', $command, implode(PHP_EOL, $output)));
 		}
 	}
 
@@ -201,7 +201,7 @@ class Assets
 
 		$mapCommand = '';
 		if ($createMap === TRUE) {
-			$sourceMapDirectory = dirname($this->localSourceDirectory ? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $sourceFile) : $sourceFile);
+			$sourceMapDirectory = dirname($this->localSourceDirectory !== NULL ? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $sourceFile) : $sourceFile);
 			$mapCommand = sprintf('--source-map true --source-map-root="file:///%s/" ', $sourceMapDirectory);
 		}
 
@@ -210,7 +210,7 @@ class Assets
 		exec($command, $output, $returnVal);
 
 		if ($returnVal !== 0) {
-			throw new \RuntimeException(sprintf('Error while compiling sass (%s): %s', $command, implode("\n", $output)));
+			throw new Exceptions\AssetsException(sprintf('Error while compiling sass (%s): %s', $command, implode(PHP_EOL, $output)));
 		}
 	}
 
@@ -227,7 +227,7 @@ class Assets
 			$fileRelative = $file;
 			$file = $this->sourceDirectory . DIRECTORY_SEPARATOR . $file;
 			if ($createMap === TRUE) {
-				$mapSources[$file] = 'file:///' . ($this->localSourceDirectory ? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $fileRelative) : realpath($file));
+				$mapSources[$file] = 'file:///' . ($this->localSourceDirectory !== NULL ? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $fileRelative) : realpath($file));
 			}
 		});
 
@@ -241,12 +241,16 @@ class Assets
 		exec($command, $output, $returnVal);
 
 		if ($returnVal !== 0) {
-			throw new \RuntimeException('Error while compiling js (' . $command . '): ' . implode("\n", $output));
+			throw new Exceptions\AssetsException(sprintf('Error while compiling js (%s): %s', $command, implode(PHP_EOL, $output)));
 		}
 
 		if ($createMap === TRUE) {
 			$mapFile = $destinationFile . '.map';
-			file_put_contents($mapFile, strtr(file_get_contents($mapFile), $mapSources));
+			$mapContents = file_get_contents($mapFile);
+			if ($mapContents === FALSE) {
+				throw new Exceptions\AssetsException(sprintf('Map file \'%s\' doesn\'t exists', $mapFile));
+			}
+			file_put_contents($mapFile, strtr($mapContents, $mapSources));
 		}
 	}
 
@@ -254,14 +258,19 @@ class Assets
 	private function lock(): string
 	{
 		$handle = @fopen($this->lockFile, 'c+'); // intentionally @
-		if (!$handle) {
-			throw new \RuntimeException(sprintf('Unable to create file \'%s\' %s', $this->lockFile, error_get_last()['message']));
+		if ($handle === FALSE) {
+			throw new Exceptions\AssetsException(sprintf('Unable to create file \'%s\' %s', $this->lockFile, error_get_last()['message']));
 		} elseif (!@flock($handle, LOCK_EX)) { // intentionally @
-			throw new \RuntimeException(sprintf('Unable to acquire exclusive lock on \'%s\' %s', $this->lockFile, error_get_last()['message']));
+			throw new Exceptions\AssetsException(sprintf('Unable to acquire exclusive lock on \'%s\' %s', $this->lockFile, error_get_last()['message']));
 		}
 		$this->lockHandle = $handle;
 
-		return realpath($this->lockFile);
+		$lockPath = realpath($this->lockFile);
+		if ($lockPath === FALSE) {
+			throw new Exceptions\AssetsException('Lock file not exists');
+		}
+
+		return $lockPath;
 	}
 
 

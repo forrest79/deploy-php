@@ -15,6 +15,10 @@
 		"nette/utils": "^2.5",
 		"phpseclib/phpseclib": "^2.0"
 	},
+	"require-dev": {
+		"phpstan/phpstan": "^0.10.5",
+		"phpstan/phpstan-strict-rules": "^0.10.1"
+	},
 	"autoload": {
 		"psr-4": {
 			"Forrest79\\DeployPhp\\": "src/"

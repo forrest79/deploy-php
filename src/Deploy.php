@@ -21,7 +21,7 @@ class Deploy
 	public function __construct(string $environment, array $additionalConfig = [])
 	{
 		if (!isset($this->config[$environment])) {
-			throw new \RuntimeException(sprintf('Environment \'%s\' not exists in configuration.', $environment));
+			throw new Exceptions\DeployException(sprintf('Environment \'%s\' not exists in configuration.', $environment));
 		}
 
 		$this->environment = array_replace_recursive($this->config[$environment], $additionalConfig);
@@ -64,7 +64,16 @@ class Deploy
 		$zipFile = $checkoutDirectory . DIRECTORY_SEPARATOR . uniqid() . '-git.zip';
 
 		$currentDirectory = getcwd();
-		chdir(realpath($gitRootDirectory));
+		if ($currentDirectory === FALSE) {
+			throw new Exceptions\DeployException('Can\'t determine current directory');
+		}
+
+		$gitRootDirectoryPath = realpath($gitRootDirectory);
+		if ($gitRootDirectoryPath === FALSE) {
+			throw new Exceptions\DeployException(sprintf('GIT root directory \'%s\' doesn\'t exists', $gitRootDirectory));
+		}
+
+		chdir($gitRootDirectoryPath);
 
 		$this->makeDir($checkoutDirectory);
 
@@ -76,11 +85,16 @@ class Deploy
 	}
 
 
+	/**
+	 * @param string $command
+	 * @param string|bool $stdout
+	 * @return bool
+	 */
 	protected function exec(string $command, & $stdout = FALSE): bool
 	{
 		exec($command, $output, $return);
 		if ($output && ($stdout !== FALSE)) {
-			$stdout = implode("\n", $output);
+			$stdout = implode(PHP_EOL, $output);
 		}
 		return ($return === 0) ? TRUE : FALSE;
 	}
@@ -90,27 +104,35 @@ class Deploy
 	{
 		exec(sprintf('tar -C %s --force-local -zcvf %s %s', $sourcePath, $targetFile, $sourceDir), $output, $return);
 		if ($return !== 0) {
-			throw new \RuntimeException(sprintf('Can\'t create tar.gz archive \'%s\': %s', $targetFile, implode(PHP_EOL, $output)));
+			throw new Exceptions\DeployException(sprintf('Can\'t create tar.gz archive \'%s\': %s', $targetFile, implode(PHP_EOL, $output)));
 		}
 	}
 
 
+	/**
+	 * @param string $command
+	 * @param string|NULL $validate
+	 * @param string|NULL $output
+	 * @param string|NULL $host
+	 * @param int $port
+	 * @return bool
+	 */
 	protected function ssh(string $command, ?string $validate = NULL, & $output = NULL, ?string $host = NULL, int $port = 22): bool
 	{
 		$output = $this->sshExec($this->sshConnect($host, $port), $command . ';echo "[return_code:$?]"');
 
-		preg_match( '/\[return_code:(.*?)\]/', $output, $match);
-		$output = preg_replace( '/\[return_code:(.*?)\]/', '', $output);
+		preg_match('/\[return_code:(.*?)\]/', $output, $match);
+		$output = preg_replace('/\[return_code:(.*?)\]/', '', $output);
 
 		if ($match[1] !== '0') {
-			$this->log(sprintf('!-> SSH error output for command "%s": %s', $command, $output));
+			$this->log(sprintf('SSH error output for command "%s": %s', $command, $output));
 			return FALSE;
 		}
 
-		if ($validate) {
-			$success = strpos($output, $validate) !== FALSE;
+		if ($validate !== NULL) {
+			$success = strpos($output ?: '', $validate) !== FALSE;
 			if (!$success) {
-				$this->log(sprintf('!-> SSH validation error: "%s" doesn\'t contains "%s"', $output, $validate));
+				$this->log(sprintf('SSH validation error: "%s" doesn\'t contains "%s"', $output, $validate));
 			}
 			return $success;
 		}
@@ -136,14 +158,22 @@ class Deploy
 	protected function httpRequest(string $url, ?string $validate = NULL): bool
 	{
 		$curl = curl_init($url);
+		if ($curl === FALSE) {
+			throw new Exceptions\DeployException('Can\'t initialize curl');
+		}
+
 		curl_setopt($curl, CURLOPT_HEADER, FALSE);
 		curl_setopt($curl, CURLOPT_RETURNTRANSFER, $validate !== NULL);
 
 		$returned = curl_exec($curl);
+
 		$errorNo = curl_errno($curl);
 		curl_close($curl);
 
 		if ($validate !== NULL) {
+			if (!is_string($returned)) {
+				return FALSE;
+			}
 			return strpos($returned, $validate) !== FALSE;
 		}
 
@@ -153,7 +183,7 @@ class Deploy
 
 	protected function error(?string $message = NULL): void
 	{
-		throw new \RuntimeException($message);
+		throw new Exceptions\DeployException($message ?: '');
 	}
 
 
@@ -181,13 +211,17 @@ class Deploy
 				if (isset($credentials['passphrase']) && $credentials['passphrase']) {
 					$privateKey->setPassword($credentials['passphrase']);
 				}
-				$privateKey->loadKey(file_get_contents($credentials['private_key']));
+				$privateKeyContents = file_get_contents($credentials['private_key']);
+				if ($privateKeyContents === FALSE) {
+					throw new Exceptions\DeployException(sprintf('SSH can\'t load private key \'%s\'', $credentials['private_key']));
+				}
+				$privateKey->loadKey($privateKeyContents);
 
 				if (!$sshConnection->login($credentials['username'], $privateKey)) {
-					throw new \RuntimeException(sprintf('!-> SSH can\'t authenticate with private key "%s"', $credentials['private_key']));
+					throw new Exceptions\DeployException(sprintf('SSH can\'t authenticate with private key \'%s\'', $credentials['private_key']));
 				}
 			} else {
-				throw new \RuntimeException('!-> Unsupported authentication type for SSH.');
+				throw new Exceptions\DeployException('Unsupported authentication type for SSH.');
 			}
 
 			$this->sshConnections[$key] = $sshConnection;
@@ -205,7 +239,11 @@ class Deploy
 
 	public static function getResponse(): string
 	{
-		return stream_get_line(STDIN, 1024, PHP_EOL);
+		$response = stream_get_line(STDIN, 1024, PHP_EOL);
+		if ($response === FALSE) {
+			throw new Exceptions\DeployException('Can\'t get response');
+		}
+		return $response;
 	}
 
 
@@ -215,7 +253,11 @@ class Deploy
 	public static function getHiddenResponse(): string
 	{
 		if ('\\' === DIRECTORY_SEPARATOR) {
-			return rtrim(shell_exec(__DIR__ . '/../bin/hiddeninput.exe'));
+			$response = shell_exec(__DIR__ . '/../bin/hiddeninput.exe');
+			if ($response === NULL) {
+				throw new Exceptions\DeployException('Unable to hide the response on Windows');
+			}
+			return rtrim($response);
 		}
 
 		if (self::hasSttyAvailable()) {
@@ -226,7 +268,7 @@ class Deploy
 			shell_exec(sprintf('stty %s', $sttyMode));
 
 			if ($value === FALSE) {
-				throw new \RuntimeException('Hidden response aborted.');
+				throw new Exceptions\DeployException('Hidden response aborted.');
 			}
 
 			$value = trim($value);
@@ -234,27 +276,35 @@ class Deploy
 			return $value;
 		}
 
-		if (($shell = self::getShell()) !== FALSE) {
+		if (($shell = self::getShell()) !== NULL) {
 			$readCmd = 'csh' === $shell ? 'set mypassword = $<' : 'read -r mypassword';
 			$command = sprintf("/usr/bin/env %s -c 'stty -echo; %s; stty echo; echo \$mypassword'", $shell, $readCmd);
-			$value = rtrim(shell_exec($command));
+			$response = shell_exec($command);
+			if ($response === NULL) {
+				throw new Exceptions\DeployException('Unable to hide the response on Shell');
+			}
+			$value = rtrim($response);
 
 			return $value;
 		}
 
-		throw new \RuntimeException('Unable to hide the response.');
+		throw new Exceptions\DeployException('Unable to hide the response');
 	}
 
 
-	private static function getShell()
+	private static function getShell(): ?string
 	{
-		$shell = FALSE;
+		$shell = NULL;
 
 		if (file_exists('/usr/bin/env')) {
 			// handle other OSs with bash/zsh/ksh/csh if available to hide the answer
 			$test = "/usr/bin/env %s -c 'echo OK' 2> /dev/null";
 			foreach (['bash', 'zsh', 'ksh', 'csh'] as $sh) {
-				if (rtrim(shell_exec(sprintf($test, $sh))) === 'OK') {
+				$response = shell_exec(sprintf($test, $sh));
+				if ($response === NULL) {
+					throw new Exceptions\DeployException('Unable to get shell');
+				}
+				if (rtrim($response) === 'OK') {
 					$shell = $sh;
 					break;
 				}
