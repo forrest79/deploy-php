@@ -87,7 +87,7 @@ class Deploy
 
 	/**
 	 * @param string $command
-	 * @param string|bool $stdout
+	 * @param string|FALSE $stdout
 	 * @return bool
 	 */
 	protected function exec(string $command, & $stdout = FALSE): bool
