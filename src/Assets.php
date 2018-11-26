@@ -74,7 +74,7 @@ class Assets
 			$files[$item->getPathname()] = $item->getMTime();
 		}
 
-		$newHash = md5(serialize($this->config) . serialize($files));
+		$newHash = md5(serialize($this->config) . $this->localSourceDirectory . serialize($files));
 
 		if ($oldHash !== $newHash) {
 			$this->buildAssets(self::DEBUG);
