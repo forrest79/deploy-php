@@ -109,6 +109,24 @@ class Deploy
 	}
 
 
+	protected function validatePrivateKey(?string $privateKeyFile = NULL, ?string $passphrase = NULL): bool
+	{
+		$credentials = $this->environment['ssh'];
+
+		$privateKey = new Crypt\RSA();
+		if ((($privateKeyFile !== NULL) && ($passphrase !== NULL)) || (($privateKeyFile === NULL) && isset($credentials['passphrase']) && $credentials['passphrase'])) {
+			$privateKey->setPassword($passphrase ?: $credentials['passphrase']);
+		}
+		$privateKeyContents = file_get_contents($privateKeyFile ?: $credentials['private_key']);
+		if ($privateKeyContents === FALSE) {
+			throw new Exceptions\DeployException(sprintf('SSH can\'t load private key \'%s\'', $credentials['private_key']));
+		}
+		$privateKey->loadKey($privateKeyContents);
+
+		return $privateKey->getPublicKey(Crypt\RSA::PUBLIC_FORMAT_RAW) !== FALSE;
+	}
+
+
 	/**
 	 * @param string $command
 	 * @param string|NULL $validate

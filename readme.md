@@ -239,8 +239,12 @@ Contains just some helper methods to checkout from GIT, copy files via SCP a run
 ```php
 use Forrest79\DeployPhp;
 
-require __DIR__ . '/../vendor/autoload.php'; // with required Nette components
-require __DIR__ . '/vendor/autoload.php';
+require __DIR__ . '/../vendor/autoload.php';
+
+//define('SSH_PRIVATE_KEY', 'define-this-in-deploy.local.php');
+//define('DEPLOY_TEMP_DIRECTORY', 'define-this-in-deploy.local.php'); // if you want to change from default repository temp - on VirtualBox is recommended /tmp/... or some local (not shared) directory
+
+require __DIR__ . '/deploy.local.php';
 
 class Deploy extends DeployPhp\Deploy
 {
@@ -274,7 +278,9 @@ class Deploy extends DeployPhp\Deploy
 
     protected function setup()
     {
-        $this->releasesDirectory = __DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . 'temp' . DIRECTORY_SEPARATOR . 'deploy';
+        $this->releasesDirectory = defined('DEPLOY_TEMP_DIRECTORY')
+            ? DEPLOY_TEMP_DIRECTORY
+            : __DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . 'temp' . DIRECTORY_SEPARATOR . 'deploy';
 
         $this->releaseName = 'release-' . date('Ymd-His') . '-' . uniqid();
         $this->releasePackage = $this->releaseName . '.tar.gz';
@@ -284,6 +290,10 @@ class Deploy extends DeployPhp\Deploy
 
     public function run()
     {
+        if (!$this->validatePrivateKey()) {
+            $this->error('Bad passphrase for private key or bad private key.');
+        }
+
         $this->log('=> Creating build...');
         $this->createBuild();
         $this->log('   ...DONE');
@@ -387,7 +397,16 @@ if ($argc == 1) {
 }
 
 echo 'Enter SSH key password: ';
-$additionalOptions = ['ssh' => ['passphrase' => stream_get_line(STDIN, 1024, PHP_EOL)]];
+
+try {
+    $passphrase = Deploy::getHiddenResponse();
+    echo PHP_EOL;
+} catch (\RuntimeException $e) {
+    echo '[Can\'t get hidden response, password will be visible]: ';
+    $passphrase = Deploy::getResponse();
+}
+
+$additionalOptions = ['ssh' => ['passphrase' => $passphrase]];
 
 if ($argc > 2) {
     $additionalOptions['gitBranch'] = $argv[2];
@@ -399,4 +418,3 @@ try {
     echo $e->getMessage() . "\n";
     exit(1);
 }
-```
