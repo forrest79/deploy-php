@@ -222,7 +222,7 @@ class Deploy
 		$key = sprintf('%s@%s:%d', $credentials['username'], $host, $port);
 
 		if (!isset($this->sshConnections[$key])) {
-			$sshConnection = new Net\SSH2($host, $port, 100000); // @hack $timeout = 0/FALSE don`t work well
+			$sshConnection = new Net\SSH2($host, $port, 0);
 
 			if (isset($credentials['private_key'])) {
 				$privateKey = new Crypt\RSA();
