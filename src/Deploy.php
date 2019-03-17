@@ -135,7 +135,7 @@ class Deploy
 	 * @param int $port
 	 * @return bool
 	 */
-	protected function ssh(string $command, ?string $validate = NULL, & $output = NULL, ?string $host = NULL, int $port = 22): bool
+	protected function ssh(string $command, ?string $validate = NULL, & $output = NULL, ?string $host = NULL, ?int $port = NULL): bool
 	{
 		$output = $this->sshExec($this->sshConnect($host, $port), $command . ';echo "[return_code:$?]"');
 
@@ -159,7 +159,7 @@ class Deploy
 	}
 
 
-	protected function scp(string $localFile, string $remoteDirectory, ?string $host = NULL, int $port = 22): bool
+	protected function scp(string $localFile, string $remoteDirectory, ?string $host = NULL, ?int $port = NULL): bool
 	{
 		$remoteDirectory = rtrim($remoteDirectory, '/');
 
@@ -211,10 +211,13 @@ class Deploy
 	}
 
 
-	private function sshConnect(?string $host, int $port = 22): Net\SSH2
+	private function sshConnect(?string $host, ?int $port): Net\SSH2
 	{
 		if ($host === NULL) {
 			$host = $this->environment['ssh']['server'];
+		}
+		if ($port === NULL) {
+			$port = $this->environment['ssh']['port'] ?? 22;
 		}
 
 		$credentials = $this->environment['ssh'];
@@ -222,7 +225,7 @@ class Deploy
 		$key = sprintf('%s@%s:%d', $credentials['username'], $host, $port);
 
 		if (!isset($this->sshConnections[$key])) {
-			$sshConnection = new Net\SSH2($host, $port, 0);
+			$sshConnection = new Net\SSH2($host, $port, 100000); // @hack $timeout = 0/FALSE don`t work well
 
 			if (isset($credentials['private_key'])) {
 				$privateKey = new Crypt\RSA();
