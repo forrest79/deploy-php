@@ -201,17 +201,50 @@ class Assets
 
 		$mapCommand = '';
 		if ($createMap === TRUE) {
-			$sourceMapDirectory = dirname($this->localSourceDirectory !== NULL ? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $sourceFile) : $sourceFile);
-			$mapCommand = sprintf('--source-map true --source-map-root="file:///%s/" ', $sourceMapDirectory);
+			$mapCommand = sprintf('--source-map true ');
 		}
 
-		$command = sprintf('node-sass %s  --quiet --output-style=compressed --output="%s" %s2>&1', $sourceFileAbsolute, $destinationDirectoryAbsolute, $mapCommand);
+		$command = sprintf('node-sass %s --quiet --output-style=compressed --output="%s" %s2>&1', $sourceFileAbsolute, $destinationDirectoryAbsolute, $mapCommand);
 
 		exec($command, $output, $returnVal);
+
+		if ($createMap === TRUE) {
+			$sourceMapDirectory = dirname($this->localSourceDirectory !== NULL ? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $sourceFile) : $sourceFile);
+
+			$mapFile = $destinationDirectoryAbsolute . DIRECTORY_SEPARATOR . basename($sourceFileAbsolute, '.scss') . '.css.map';
+			$mapContents = file_get_contents($mapFile);
+			if ($mapContents === FALSE) {
+				throw new Exceptions\AssetsException(sprintf('Map file \'%s\' doesn\'t exists', $mapFile));
+			}
+			$json = json_decode($mapContents, TRUE);
+			foreach ($json['sources'] as $i => $source) {
+				$json['sources'][$i] = 'file:///' . $this->getAbsolutePath($sourceMapDirectory . DIRECTORY_SEPARATOR . $source);
+			}
+			file_put_contents($mapFile, json_encode($json));
+		}
 
 		if ($returnVal !== 0) {
 			throw new Exceptions\AssetsException(sprintf('Error while compiling sass (%s): %s', $command, implode(PHP_EOL, $output)));
 		}
+	}
+
+
+	private function getAbsolutePath(string $path): string
+	{
+		$path = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path);
+		$parts = array_filter(explode(DIRECTORY_SEPARATOR, $path), 'strlen');
+		$absolutes = [];
+		foreach ($parts as $part) {
+			if ($part === '.') {
+				continue;
+			}
+			if ($part === '..') {
+				array_pop($absolutes);
+			} else {
+				$absolutes[] = $part;
+			}
+		}
+		return implode(DIRECTORY_SEPARATOR, $absolutes);
 	}
 
 
