@@ -208,6 +208,10 @@ class Assets
 
 		exec($command, $output, $returnVal);
 
+		if ($returnVal !== 0) {
+			throw new Exceptions\AssetsException(sprintf('Error while compiling sass (%s): %s', $command, implode(PHP_EOL, $output)));
+		}
+
 		if ($createMap === TRUE) {
 			$sourceMapDirectory = dirname($this->localSourceDirectory !== NULL ? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $sourceFile) : $sourceFile);
 
@@ -221,10 +225,6 @@ class Assets
 				$json['sources'][$i] = 'file:///' . $this->getAbsolutePath($sourceMapDirectory . DIRECTORY_SEPARATOR . $source);
 			}
 			file_put_contents($mapFile, json_encode($json));
-		}
-
-		if ($returnVal !== 0) {
-			throw new Exceptions\AssetsException(sprintf('Error while compiling sass (%s): %s', $command, implode(PHP_EOL, $output)));
 		}
 	}
 
