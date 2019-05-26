@@ -24,7 +24,12 @@ class Deploy
 			throw new Exceptions\DeployException(sprintf('Environment \'%s\' not exists in configuration.', $environment));
 		}
 
-		$this->environment = array_replace_recursive($this->config[$environment], $additionalConfig);
+		$environmentConfig = array_replace_recursive($this->config[$environment], $additionalConfig);
+		if ($environmentConfig === NULL) {
+			throw new Exceptions\DeployException('Can\'t prepare environment config.');
+		}
+
+		$this->environment = $environmentConfig;
 
 		$this->setup();
 	}
