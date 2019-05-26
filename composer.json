@@ -13,11 +13,11 @@
 	"require": {
 		"php": ">=7.1.0",
 		"nette/utils": "^2.5",
-		"phpseclib/phpseclib": "^2.0.13"
+		"phpseclib/phpseclib": "^2.0"
 	},
 	"require-dev": {
-		"phpstan/phpstan": "^0.10.5",
-		"phpstan/phpstan-strict-rules": "^0.10.1"
+		"phpstan/phpstan": "^0.10",
+		"phpstan/phpstan-strict-rules": "^0.10"
 	},
 	"autoload": {
 		"psr-4": {
