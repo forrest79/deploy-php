@@ -3,16 +3,18 @@
 namespace Forrest79\DeployPhp;
 
 use Nette\Utils;
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 
 class Assets
 {
-	const DEBUG = 'debug';
-	const PRODUCTION = 'production';
+	public const DEBUG = 'debug';
+	public const PRODUCTION = 'production';
 
-	const COPY = 'copy';
-	const LESS = 'less';
-	const SASS = 'sass';
-	const JS = 'js';
+	public const COPY = 'copy';
+	public const LESS = 'less';
+	public const SASS = 'sass';
+	public const JS = 'js';
 
 	/** @var array */
 	private $config;
@@ -67,7 +69,7 @@ class Assets
 		$oldHash = call_user_func($this->readHash, $this->configFile);
 
 		$files = [];
-		foreach ($iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($this->sourceDirectory, \RecursiveDirectoryIterator::SKIP_DOTS)) as $item) {
+		foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->sourceDirectory, RecursiveDirectoryIterator::SKIP_DOTS)) as $item) {
 			if ($item->isDir() || (realpath($item->getPathname()) === $lockFile)) {
 				continue;
 			}
@@ -94,7 +96,7 @@ class Assets
 		$this->buildAssets(self::PRODUCTION);
 
 		$contents = '';
-		foreach ($iterator = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($this->sourceDirectory, \RecursiveDirectoryIterator::SKIP_DOTS)) as $item) {
+		foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->sourceDirectory, RecursiveDirectoryIterator::SKIP_DOTS)) as $item) {
 			if ($item->isDir() || (realpath($item->getPathname()) === $lockFile)) {
 				continue;
 			}
@@ -138,27 +140,27 @@ class Assets
 			$type = is_array($data) ? $data['type'] : $data;
 
 			switch ($type) {
-				case self::COPY :
+				case self::COPY:
 					Utils\FileSystem::copy($this->sourceDirectory . DIRECTORY_SEPARATOR . $path, $this->destinationDirectory . DIRECTORY_SEPARATOR . $path);
 					break;
 
-				case self::LESS :
+				case self::LESS:
 					if (!isset($data['file'])) {
 						throw new \InvalidArgumentException(sprintf('No file defined for \'%s\'.', $path));
 					}
 					$this->compilesLess($data['file'], $path, $isDebug);
 					break;
 
-				case self::SASS :
+				case self::SASS:
 					if (!isset($data['file']) && !isset($data['files'])) {
 						throw new \InvalidArgumentException(sprintf('No file or files defined for \'%s\'.', $path));
 					}
-					foreach (isset($data['files']) ? $data['files'] : [$data['file']] as $file) {
+					foreach ($data['files'] ?? [$data['file']] as $file) {
 						$this->compilesSass($file, $path, $isDebug);
 					}
 					break;
 
-				case self::JS :
+				case self::JS:
 					if (!isset($data['files'])) {
 						throw new \InvalidArgumentException(sprintf('No files defined for \'%s\'.', $path));
 					}
@@ -256,7 +258,7 @@ class Assets
 
 		$mapSources = [];
 
-		array_walk($sourceFiles, function (& $file) use ($createMap, & $mapSources) {
+		array_walk($sourceFiles, function (& $file) use ($createMap, & $mapSources): void {
 			$fileRelative = $file;
 			$file = $this->sourceDirectory . DIRECTORY_SEPARATOR . $file;
 			if ($createMap === TRUE) {

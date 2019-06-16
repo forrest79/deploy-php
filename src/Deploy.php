@@ -101,7 +101,7 @@ class Deploy
 		if ($output && ($stdout !== FALSE)) {
 			$stdout = implode(PHP_EOL, $output);
 		}
-		return ($return === 0) ? TRUE : FALSE;
+		return $return === 0;
 	}
 
 
@@ -132,15 +132,7 @@ class Deploy
 	}
 
 
-	/**
-	 * @param string $command
-	 * @param string|NULL $validate
-	 * @param string|NULL $output
-	 * @param string|NULL $host
-	 * @param int $port
-	 * @return bool
-	 */
-	protected function ssh(string $command, ?string $validate = NULL, & $output = NULL, ?string $host = NULL, ?int $port = NULL): bool
+	protected function ssh(string $command, ?string $validate = NULL, ?string & $output = NULL, ?string $host = NULL, ?int $port = NULL): bool
 	{
 		$output = $this->sshExec($this->sshConnect($host, $port), $command . ';echo "[return_code:$?]"');
 
@@ -278,7 +270,7 @@ class Deploy
 	 */
 	public static function getHiddenResponse(): string
 	{
-		if ('\\' === DIRECTORY_SEPARATOR) {
+		if (DIRECTORY_SEPARATOR === '\\') {
 			$response = shell_exec(__DIR__ . '/../bin/hiddeninput.exe');
 			if ($response === NULL) {
 				throw new Exceptions\DeployException('Unable to hide the response on Windows');
@@ -302,16 +294,15 @@ class Deploy
 			return $value;
 		}
 
-		if (($shell = self::getShell()) !== NULL) {
-			$readCmd = 'csh' === $shell ? 'set mypassword = $<' : 'read -r mypassword';
+		$shell = self::getShell();
+		if ($shell !== NULL) {
+			$readCmd = ($shell === 'csh') ? 'set mypassword = $<' : 'read -r mypassword';
 			$command = sprintf("/usr/bin/env %s -c 'stty -echo; %s; stty echo; echo \$mypassword'", $shell, $readCmd);
 			$response = shell_exec($command);
 			if ($response === NULL) {
 				throw new Exceptions\DeployException('Unable to hide the response on Shell');
 			}
-			$value = rtrim($response);
-
-			return $value;
+			return rtrim($response);
 		}
 
 		throw new Exceptions\DeployException('Unable to hide the response');
@@ -344,7 +335,7 @@ class Deploy
 	private static function hasSttyAvailable(): bool
 	{
 		exec('stty 2>&1', $output, $exitcode);
-		return 0 === $exitcode;
+		return $exitcode === 0;
 	}
 
 }
