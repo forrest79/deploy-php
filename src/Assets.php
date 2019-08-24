@@ -234,7 +234,9 @@ class Assets
 	private function getAbsolutePath(string $path): string
 	{
 		$path = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path);
-		$parts = array_filter(explode(DIRECTORY_SEPARATOR, $path), 'strlen');
+		$parts = array_filter(explode(DIRECTORY_SEPARATOR, $path), static function ($value): bool {
+			return strlen($value) > 0;
+		});
 		$absolutes = [];
 		foreach ($parts as $part) {
 			if ($part === '.') {
