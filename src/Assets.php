@@ -16,7 +16,7 @@ class Assets
 	public const SASS = 'sass';
 	public const JS = 'js';
 
-	/** @var array */
+	/** @var array<string, mixed> */
 	private $config;
 
 	/** @var callable function (string $configFile): ?string */
@@ -44,6 +44,10 @@ class Assets
 	private $lockHandle;
 
 
+	/**
+	 * @param array<string, mixed> $config
+	 * @param array<string, string> $localConfig
+	 */
 	public function __construct(string $sourceDirectory, array $config, callable $readHash, callable $writeHash, array $localConfig = [])
 	{
 		$this->sourceDirectory = rtrim($sourceDirectory, '\\/');
@@ -252,6 +256,9 @@ class Assets
 	}
 
 
+	/**
+	 * @param array<string> $sourceFiles
+	 */
 	private function compilesJs(array $sourceFiles, string $destinationFile, bool $createMap): void
 	{
 		$destinationFile = $this->destinationDirectory . DIRECTORY_SEPARATOR . $destinationFile;
@@ -260,7 +267,7 @@ class Assets
 
 		$mapSources = [];
 
-		array_walk($sourceFiles, function (& $file) use ($createMap, & $mapSources): void {
+		array_walk($sourceFiles, function (&$file) use ($createMap, &$mapSources): void {
 			$fileRelative = $file;
 			$file = $this->sourceDirectory . DIRECTORY_SEPARATOR . $file;
 			if ($createMap === TRUE) {

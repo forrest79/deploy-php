@@ -8,16 +8,19 @@ use phpseclib\Net;
 
 class Deploy
 {
-	/** @var array */
+	/** @var array<string, mixed> */
 	protected $config = [];
 
-	/** @var array */
+	/** @var array<string, mixed> */
 	protected $environment = [];
 
-	/** @var array */
+	/** @var array<string, Net\SSH2> */
 	private $sshConnections = [];
 
 
+	/**
+	 * @param array<string, mixed> $additionalConfig
+	 */
 	public function __construct(string $environment, array $additionalConfig = [])
 	{
 		if (!isset($this->config[$environment])) {
@@ -91,11 +94,9 @@ class Deploy
 
 
 	/**
-	 * @param string $command
 	 * @param string|FALSE $stdout
-	 * @return bool
 	 */
-	protected function exec(string $command, & $stdout = FALSE): bool
+	protected function exec(string $command, &$stdout = FALSE): bool
 	{
 		exec($command, $output, $return);
 		if ($output && ($stdout !== FALSE)) {
@@ -120,9 +121,9 @@ class Deploy
 
 		$privateKey = new Crypt\RSA();
 		if ((($privateKeyFile !== NULL) && ($passphrase !== NULL)) || (($privateKeyFile === NULL) && isset($credentials['passphrase']) && $credentials['passphrase'])) {
-			$privateKey->setPassword($passphrase ?: $credentials['passphrase']);
+			$privateKey->setPassword($passphrase ?? $credentials['passphrase']);
 		}
-		$privateKeyContents = file_get_contents($privateKeyFile ?: $credentials['private_key']);
+		$privateKeyContents = file_get_contents($privateKeyFile ?? $credentials['private_key']);
 		if ($privateKeyContents === FALSE) {
 			throw new Exceptions\DeployException(sprintf('SSH can\'t load private key \'%s\'', $credentials['private_key']));
 		}
@@ -132,7 +133,7 @@ class Deploy
 	}
 
 
-	protected function ssh(string $command, ?string $validate = NULL, ?string & $output = NULL, ?string $host = NULL, ?int $port = NULL): bool
+	protected function ssh(string $command, ?string $validate = NULL, ?string &$output = NULL, ?string $host = NULL, ?int $port = NULL): bool
 	{
 		$output = $this->sshExec($this->sshConnect($host, $port), $command . ';echo "[return_code:$?]"');
 
@@ -145,7 +146,7 @@ class Deploy
 		}
 
 		if ($validate !== NULL) {
-			$success = strpos($output ?: '', $validate) !== FALSE;
+			$success = strpos($output ?? '', $validate) !== FALSE;
 			if (!$success) {
 				$this->log(sprintf('SSH validation error: "%s" doesn\'t contains "%s"', $output, $validate));
 			}
@@ -198,7 +199,7 @@ class Deploy
 
 	protected function error(?string $message = NULL): void
 	{
-		throw new Exceptions\DeployException($message ?: '');
+		throw new Exceptions\DeployException($message ?? '');
 	}
 
 
