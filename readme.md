@@ -16,7 +16,7 @@ Forrest79/DeployPhp requires PHP 7.1 or higher.
 The recommended way to install Forrest79/DeployPhp is through Composer:
 
 ```sh
-composer require forrest79/deploy-php
+composer require --dev forrest79/deploy-php
 ```
 
 
