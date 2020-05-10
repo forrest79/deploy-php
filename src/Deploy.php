@@ -9,13 +9,13 @@ use phpseclib\Net;
 class Deploy
 {
 	/** @var array<string, mixed> */
-	protected $config = [];
+	protected array $config = [];
 
 	/** @var array<string, mixed> */
-	protected $environment = [];
+	protected array $environment;
 
 	/** @var array<string, Net\SSH2> */
-	private $sshConnections = [];
+	private array $sshConnections = [];
 
 
 	/**
@@ -133,7 +133,13 @@ class Deploy
 	}
 
 
-	protected function ssh(string $command, ?string $validate = NULL, ?string &$output = NULL, ?string $host = NULL, ?int $port = NULL): bool
+	protected function ssh(
+		string $command,
+		?string $validate = NULL,
+		?string &$output = NULL,
+		?string $host = NULL,
+		?int $port = NULL
+	): bool
 	{
 		$output = $this->sshExec($this->sshConnect($host, $port), $command . ';echo "[return_code:$?]"');
 

@@ -2,6 +2,7 @@
 
 namespace Forrest79\DeployPhp;
 
+use Closure;
 use Nette\Utils;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -17,28 +18,23 @@ class Assets
 	public const JS = 'js';
 
 	/** @var array<string, mixed> */
-	private $config;
+	private array $config;
 
-	/** @var callable function (string $configFile): ?string */
-	private $readHash;
+	/** function (string $configFile): ?string */
+	private Closure $readHash;
 
-	/** @var callable function (string $configFile, string $hash): void */
-	private $writeHash;
+	/** callable function (string $configFile, string $hash): void */
+	private Closure $writeHash;
 
-	/** @var string */
-	private $sourceDirectory;
+	private string $sourceDirectory;
 
-	/** @var string */
-	private $destinationDirectory;
+	private string $destinationDirectory;
 
-	/** @var string */
-	private $localSourceDirectory;
+	private ?string $localSourceDirectory = NULL;
 
-	/** @var string */
-	private $configFile;
+	private string $configFile;
 
-	/** @var string */
-	private $lockFile;
+	private string $lockFile;
 
 	/** @var resource */
 	private $lockHandle;
@@ -48,7 +44,13 @@ class Assets
 	 * @param array<string, mixed> $config
 	 * @param array<string, string> $localConfig
 	 */
-	public function __construct(string $sourceDirectory, array $config, callable $readHash, callable $writeHash, array $localConfig = [])
+	public function __construct(
+		string $sourceDirectory,
+		array $config,
+		Closure $readHash,
+		Closure $writeHash,
+		array $localConfig = []
+	)
 	{
 		$this->sourceDirectory = rtrim($sourceDirectory, '\\/');
 
@@ -238,9 +240,7 @@ class Assets
 	private function getAbsolutePath(string $path): string
 	{
 		$path = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path);
-		$parts = array_filter(explode(DIRECTORY_SEPARATOR, $path), static function ($value): bool {
-			return strlen($value) > 0;
-		});
+		$parts = array_filter(explode(DIRECTORY_SEPARATOR, $path), static fn ($value): bool => strlen($value) > 0);
 		$absolutes = [];
 		foreach ($parts as $part) {
 			if ($part === '.') {
