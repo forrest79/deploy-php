@@ -10,9 +10,11 @@ parameters:
 		-
 			message: "#Offset 'message' does not exist on array\\('type' => int, 'message' => string, 'file' => string, 'line' => int\\)\\|null\\.#"
 			path: %rootDir%/../../../src/Assets.php
+			count: 2
 
 		# === PHPStan bad function definition ===
 
 		-
 			message: '#Strict comparison using === between array and null will always evaluate to false\.#'
 			path: %rootDir%/../../../src/Deploy.php
+			count: 1
