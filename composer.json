@@ -25,5 +25,9 @@
 		"psr-4": {
 			"Forrest79\\DeployPhp\\": "src/"
 		}
+	},
+	"scripts": {
+		"phpcs": "vendor/bin/phpcs -s src",
+		"phpstan": "vendor/bin/phpstan analyse src"
 	}
 }
