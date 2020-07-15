@@ -41,6 +41,7 @@
 		<exclude name="SlevomatCodingStandard.Files.LineLength.LineTooLong"/>
 		<exclude name="SlevomatCodingStandard.Functions.DisallowArrowFunction.DisallowedArrowFunction"/>
 		<exclude name="SlevomatCodingStandard.Functions.DisallowEmptyFunction.EmptyFunction"/>
+		<exclude name="SlevomatCodingStandard.Functions.RequireArrowFunction.RequiredArrowFunction"/><!-- PHP 7.4 -->
 		<exclude name="SlevomatCodingStandard.Namespaces.FullyQualifiedClassNameAfterKeyword.NonFullyQualifiedExtends"/>
 		<exclude name="SlevomatCodingStandard.Namespaces.FullyQualifiedClassNameInAnnotation.NonFullyQualifiedClassName"/>
 		<exclude name="SlevomatCodingStandard.Namespaces.FullyQualifiedExceptions.NonFullyQualifiedException"/>
@@ -67,6 +68,10 @@
 			<property name="newlinesCountBetweenOpenTagAndDeclare" type="int" value="0"/>
 			<property name="spacesCountAroundEqualsSign" type="int" value="0"/>
 		</properties>
+	</rule>
+
+	<rule ref="SlevomatCodingStandard.TypeHints.PropertyTypeHint.MissingNativeTypeHint">
+		<exclude-pattern>src/*</exclude-pattern>
 	</rule>
 
 	<rule ref="SlevomatCodingStandard.Files.TypeNameMatchesFileName">
