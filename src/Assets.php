@@ -2,7 +2,6 @@
 
 namespace Forrest79\DeployPhp;
 
-use Closure;
 use Nette\Utils;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -18,23 +17,28 @@ class Assets
 	public const JS = 'js';
 
 	/** @var array<string, mixed> */
-	private array $config;
+	private $config;
 
-	/** function (string $configFile): ?string */
-	private Closure $readHash;
+	/** @var callable function (string $configFile): ?string */
+	private $readHash;
 
-	/** callable function (string $configFile, string $hash): void */
-	private Closure $writeHash;
+	/** @var callable function (string $configFile, string $hash): void */
+	private $writeHash;
 
-	private string $sourceDirectory;
+	/** @var string */
+	private $sourceDirectory;
 
-	private string $destinationDirectory;
+	/** @var string */
+	private $destinationDirectory;
 
-	private ?string $localSourceDirectory = NULL;
+	/** @var string */
+	private $localSourceDirectory;
 
-	private string $configFile;
+	/** @var string */
+	private $configFile;
 
-	private string $lockFile;
+	/** @var string */
+	private $lockFile;
 
 	/** @var resource */
 	private $lockHandle;
@@ -45,10 +49,11 @@ class Assets
 	 * @param array<string, string> $localConfig
 	 */
 	public function __construct(
+		string $tempDirectory,
 		string $sourceDirectory,
 		array $config,
-		Closure $readHash,
-		Closure $writeHash,
+		callable $readHash,
+		callable $writeHash,
 		array $localConfig = []
 	)
 	{
@@ -62,7 +67,7 @@ class Assets
 			$this->localSourceDirectory = rtrim($localConfig['localSourceDirectory'], '\\/');
 		}
 
-		$this->lockFile = $this->sourceDirectory . DIRECTORY_SEPARATOR . 'assets.lock';
+		$this->lockFile = $tempDirectory . DIRECTORY_SEPARATOR . 'assets.lock';
 	}
 
 
@@ -240,7 +245,9 @@ class Assets
 	private function getAbsolutePath(string $path): string
 	{
 		$path = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path);
-		$parts = array_filter(explode(DIRECTORY_SEPARATOR, $path), static fn ($value): bool => strlen($value) > 0);
+		$parts = array_filter(explode(DIRECTORY_SEPARATOR, $path), static function ($value): bool {
+			return strlen($value) > 0;
+		});
 		$absolutes = [];
 		foreach ($parts as $part) {
 			if ($part === '.') {
@@ -322,7 +329,6 @@ class Assets
 	{
 		@flock($this->lockHandle, LOCK_UN); // intentionally @
 		@fclose($this->lockHandle); // intentionally @
-		@unlink($this->lockFile); // intentionally @
 	}
 
 }

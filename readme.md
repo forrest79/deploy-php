@@ -42,7 +42,7 @@ sudo npm install -g --unsafe-perm node-sass
 sudo npm install -g uglify-js
 ```
 
-Using is very simple. Examples show how this works with [Nette Framework](https://github.com/nette/nette). Just create new instance `Forrest79\DeployPhp\Assets` class and pass assets source directory and configuration array to constructor. `key` is directory to process (for ```DeployPhp\Assets::COPY```) or target file (for ```DeployPhp\Assets::JS``` or ```DeployPhp\Assets::LESS```) or directory (for ```DeployPhp\Assets::SASS```) for source data and `value` can be simple `DeployPhp\Assets::COPY` which tells to copy this file/directory from source to destination as is or another `array` with items:
+Using is very simple. Examples show how this works with [Nette Framework](https://github.com/nette/nette). Just create new instance `Forrest79\DeployPhp\Assets` class and pass temp directory, assets source directory and configuration array to constructor. `key` is directory to process (for ```DeployPhp\Assets::COPY```) or target file (for ```DeployPhp\Assets::JS``` or ```DeployPhp\Assets::LESS```) or directory (for ```DeployPhp\Assets::SASS```) for source data and `value` can be simple `DeployPhp\Assets::COPY` which tells to copy this file/directory from source to destination as is or another `array` with items:
 
 - required `type` - with value `DeployPhp\Assets::COPY` to copy file/directory or `DeployPhp\Assets::LESS` to compile and minify less to CSS or `DeployPhp\Assets::JS` to concatenate and minify JavaScripts
 - optional `env` - if missing, this item is proccess for debug and production environment or you can specify concrete environment `DeployPhp\Assets::DEBUG` or `DeployPhp\Assets::PRODUCTION`
@@ -70,7 +70,10 @@ use Forrest79\DeployPhp;
 
 require __DIR__ . '/vendor/autoload.php';
 
-return (new DeployPhp\Assets(__DIR__ . '/assets', [
+return (new DeployPhp\Assets(
+    __DIR__ . '/../temp',
+    __DIR__ . '/assets',
+    [
         'images' => DeployPhp\Assets::COPY,
         'fonts' => DeployPhp\Assets::COPY,
         'css/styles.css' => [ // target file
@@ -101,7 +104,8 @@ return (new DeployPhp\Assets(__DIR__ . '/assets', [
             'type' => DeployPhp\Assets::COPY,
             'env' => DeployPhp\Assets::DEBUG,
         ],
-    ], function (string $configFile): ?string {
+    ],
+    static function (string $configFile): ?string {
         if (!file_exists($configFile)) {
             return NULL;
         }
@@ -112,9 +116,11 @@ return (new DeployPhp\Assets(__DIR__ . '/assets', [
         }
 
         return $data['assets']['hash'];
-    }, function (string $configFile, string $hash): void {
+    },
+    static function (string $configFile, string $hash): void {
         file_put_contents($configFile, "assets:\n\t\thash: $hash\n");
-    }, (file_exists($assetsLocalFile = (__DIR__ . '/assets.local.php'))) ? require $assetsLocalFile : [])
+    },
+    ((($localConfig = @include __DIR__ . '/assets.local.php') === FALSE) ? [] : $localConfig)
 );
 ```
 
