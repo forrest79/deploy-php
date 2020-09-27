@@ -149,9 +149,10 @@ if (PHP_SAPI !== 'cli') {
     $assetsConfigFile = __DIR__ . '/config/config.assets.neon';
     $configurator->addConfig($assetsConfigFile);
     if ($configurator->isDebugMode()) {
-        /** @var Forrest79\DeployPhp\Assets $assets */
-        $assets = require __DIR__ . '/../deploy/assets.php';
-        $assets->buildDebug($assetsConfigFile, __DIR__ . '/../www/assets')
+        $assets = @include __DIR__ . '/../assets/assets.php'; // intentionally @ - file may not exists - good when production with production assets is running in debug mode (production preferable doesn't have assets source) 
+        if ($assets !== FALSE) {
+            $assets->buildDebug($assetsConfigFile, __DIR__ . '/../../www/assets');
+        }
     }
 }
 
