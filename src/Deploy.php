@@ -278,19 +278,19 @@ class Deploy
 	public static function getHiddenResponse(): string
 	{
 		if (DIRECTORY_SEPARATOR === '\\') {
-			$response = shell_exec(__DIR__ . '/../bin/hiddeninput.exe');
-			if ($response === NULL) {
+			exec(__DIR__ . '/../bin/hiddeninput.exe', $output, $resultCode);
+			if ($resultCode !== 0) {
 				throw new Exceptions\DeployException('Unable to hide the response on Windows');
 			}
-			return rtrim($response);
+			return rtrim(implode(PHP_EOL, $output));
 		}
 
 		if (self::hasSttyAvailable()) {
-			$sttyMode = shell_exec('stty -g');
+			$sttyMode = exec('stty -g');
 
-			shell_exec('stty -echo');
+			exec('stty -echo');
 			$value = fgets(STDIN, 4096);
-			shell_exec(sprintf('stty %s', $sttyMode));
+			exec(sprintf('stty %s', $sttyMode));
 
 			if ($value === FALSE) {
 				throw new Exceptions\DeployException('Hidden response aborted.');
@@ -305,11 +305,11 @@ class Deploy
 		if ($shell !== NULL) {
 			$readCmd = ($shell === 'csh') ? 'set mypassword = $<' : 'read -r mypassword';
 			$command = sprintf("/usr/bin/env %s -c 'stty -echo; %s; stty echo; echo \$mypassword'", $shell, $readCmd);
-			$response = shell_exec($command);
-			if ($response === NULL) {
+			exec($command, $output, $resultCode);
+			if ($resultCode !== 0) {
 				throw new Exceptions\DeployException('Unable to hide the response on Shell');
 			}
-			return rtrim($response);
+			return rtrim(implode(PHP_EOL, $output));
 		}
 
 		throw new Exceptions\DeployException('Unable to hide the response');
@@ -324,11 +324,11 @@ class Deploy
 			// handle other OSs with bash/zsh/ksh/csh if available to hide the answer
 			$test = "/usr/bin/env %s -c 'echo OK' 2> /dev/null";
 			foreach (['bash', 'zsh', 'ksh', 'csh'] as $sh) {
-				$response = shell_exec(sprintf($test, $sh));
-				if ($response === NULL) {
+				exec(sprintf($test, $sh), $output, $resultCode);
+				if ($resultCode !== 0) {
 					throw new Exceptions\DeployException('Unable to get shell');
 				}
-				if (rtrim($response) === 'OK') {
+				if (rtrim(implode(PHP_EOL, $output)) === 'OK') {
 					$shell = $sh;
 					break;
 				}
