@@ -3,8 +3,9 @@
 namespace Forrest79\DeployPhp;
 
 use Nette\Utils;
-use phpseclib\Crypt;
-use phpseclib\Net;
+use phpseclib3\Crypt;
+use phpseclib3\Exception;
+use phpseclib3\Net;
 
 class Deploy
 {
@@ -117,19 +118,19 @@ class Deploy
 
 	protected function validatePrivateKey(?string $privateKeyFile = NULL, ?string $passphrase = NULL): bool
 	{
+		if (($privateKeyFile === NULL) && ($passphrase !== NULL)) {
+			throw new Exceptions\DeployException('Can\'t provide passphrase without private key file');
+		}
+
 		$credentials = $this->environment['ssh'];
 
-		$privateKey = new Crypt\RSA();
-		if ((($privateKeyFile !== NULL) && ($passphrase !== NULL)) || (($privateKeyFile === NULL) && isset($credentials['passphrase']) && $credentials['passphrase'])) {
-			$privateKey->setPassword($passphrase ?? $credentials['passphrase']);
+		try {
+			$this->createPrivateKey($privateKeyFile ?? $credentials['private_key'], $passphrase ?? $credentials['passphrase'] ?? NULL);
+		} catch (Exception\NoKeyLoadedException $e) {
+			return FALSE;
 		}
-		$privateKeyContents = file_get_contents($privateKeyFile ?? $credentials['private_key']);
-		if ($privateKeyContents === FALSE) {
-			throw new Exceptions\DeployException(sprintf('SSH can\'t load private key \'%s\'', $credentials['private_key']));
-		}
-		$privateKey->loadKey($privateKeyContents);
 
-		return $privateKey->getPublicKey(Crypt\RSA::PUBLIC_FORMAT_RAW) !== FALSE;
+		return TRUE;
 	}
 
 
@@ -141,7 +142,7 @@ class Deploy
 		?int $port = NULL
 	): bool
 	{
-		$output = $this->sshExec($this->sshConnect($host, $port), $command . ';echo "[return_code:$?]"');
+		$output = $this->sshExec($this->sshConnection(Net\SSH2::class, $host, $port), $command . ';echo "[return_code:$?]"');
 
 		preg_match('/\[return_code:(.*?)\]/', $output, $match);
 		$output = preg_replace('/\[return_code:(.*?)\]/', '', $output);
@@ -163,17 +164,23 @@ class Deploy
 	}
 
 
-	protected function scp(string $localFile, string $remoteDirectory, ?string $host = NULL, ?int $port = NULL): bool
+	protected function sftpPut(
+		string $localFile,
+		string $remoteDirectory,
+		?string $host = NULL,
+		?int $port = NULL
+	): bool
 	{
 		$remoteDirectory = rtrim($remoteDirectory, '/');
 
-		$sshConnection = $this->sshConnect($host, $port);
-		$this->sshExec($sshConnection, 'mkdir -p ' . $remoteDirectory); // create remote directory if doesn't
-		$remoteAbsoluteDirectory = (substr($remoteDirectory, 0, 1) === '/') ? $remoteDirectory : (trim($this->sshExec($sshConnection, 'pwd')) . '/' . $remoteDirectory);
+		$sftp = $this->sshConnection(Net\SFTP::class, $host, $port);
+		assert($sftp instanceof Net\SFTP);
+
+		$this->sshExec($sftp, 'mkdir -p ' . $remoteDirectory); // create remote directory if doesn't
+		$remoteAbsoluteDirectory = (substr($remoteDirectory, 0, 1) === '/') ? $remoteDirectory : (trim($this->sshExec($sftp, 'pwd')) . '/' . $remoteDirectory);
 		$remoteFile = $remoteAbsoluteDirectory . '/' . basename($localFile);
 
-		$scp = new Net\SCP($sshConnection);
-		return $scp->put($remoteFile, $localFile, Net\SCP::SOURCE_LOCAL_FILE);
+		return $sftp->put($remoteFile, $localFile, Net\SFTP::SOURCE_LOCAL_FILE);
 	}
 
 
@@ -215,7 +222,10 @@ class Deploy
 	}
 
 
-	private function sshConnect(?string $host, ?int $port): Net\SSH2
+	/**
+	 * @param class-string $class
+	 */
+	private function sshConnection(string $class, ?string $host, ?int $port): Net\SSH2
 	{
 		if ($host === NULL) {
 			$host = $this->environment['ssh']['server'];
@@ -226,21 +236,14 @@ class Deploy
 
 		$credentials = $this->environment['ssh'];
 
-		$key = sprintf('%s@%s:%d', $credentials['username'], $host, $port);
+		$key = sprintf('%s|%s@%s:%d', $class, $credentials['username'], $host, $port);
 
 		if (!isset($this->sshConnections[$key])) {
-			$sshConnection = new Net\SSH2($host, $port, 0);
+			$sshConnection = new $class($host, $port, 0);
+			assert($sshConnection instanceof Net\SSH2);
 
 			if (isset($credentials['private_key'])) {
-				$privateKey = new Crypt\RSA();
-				if (isset($credentials['passphrase']) && $credentials['passphrase']) {
-					$privateKey->setPassword($credentials['passphrase']);
-				}
-				$privateKeyContents = file_get_contents($credentials['private_key']);
-				if ($privateKeyContents === FALSE) {
-					throw new Exceptions\DeployException(sprintf('SSH can\'t load private key \'%s\'', $credentials['private_key']));
-				}
-				$privateKey->loadKey($privateKeyContents);
+				$privateKey = $this->createPrivateKey($credentials['private_key'], $credentials['passphrase'] ?? NULL);
 
 				if (!$sshConnection->login($credentials['username'], $privateKey)) {
 					throw new Exceptions\DeployException(sprintf('SSH can\'t authenticate with private key \'%s\'', $credentials['private_key']));
@@ -259,6 +262,23 @@ class Deploy
 	private function sshExec(Net\SSH2 $sshConnection, string $command): string
 	{
 		return $sshConnection->exec($command);
+	}
+
+
+	private function createPrivateKey(string $privateKeyFile, ?string $passphrase): Crypt\RSA\PrivateKey
+	{
+		$privateKeyContents = file_get_contents($privateKeyFile);
+		if ($privateKeyContents === FALSE) {
+			throw new Exceptions\DeployException(sprintf('SSH can\'t load private key \'%s\'', $privateKeyFile));
+		}
+
+		// this if is for PHPStan, we can do also `Crypt\RSA::load($privateKeyContents, $passphrase ?? FALSE)` and ignora PHPStan error
+		$privateKey = $passphrase === NULL
+			? Crypt\RSA::load($privateKeyContents)
+			: Crypt\RSA::load($privateKeyContents, $passphrase);
+		assert($privateKey instanceof Crypt\RSA\PrivateKey);
+
+		return $privateKey;
 	}
 
 

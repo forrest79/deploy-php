@@ -239,7 +239,7 @@ Hash is computed from all files content, so hash is changed only when some file 
 
 ### Build and deploy
 
-Contains just some helper methods to checkout from GIT, copy files via SCP a run commands via SSH. For documentation look at example.
+Contains just some helper methods to checkout from GIT, copy files via SFTP a run commands via SSH. For documentation look at example.
 
 #### Example
 
@@ -358,7 +358,7 @@ class Deploy extends DeployPhp\Deploy
         $remoteReleaseDirectory = $this->environment['ssh']['directory'] . '/releases';
         $remoteReleaseBudilDirectory = $remoteReleaseDirectory . '/' . $this->releaseName;
         $this->log('     -> uploading build package', FALSE);
-        if (!$this->scp($this->releaseBuildPackage, $remoteReleaseDirectory)) {
+        if (!$this->sftpPut($this->releaseBuildPackage, $remoteReleaseDirectory)) {
             $this->error(' ...an error occured while uploading build package');
         }
         $this->log(' ...OK');
