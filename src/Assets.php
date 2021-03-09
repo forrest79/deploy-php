@@ -2,6 +2,7 @@
 
 namespace Forrest79\DeployPhp;
 
+use Closure;
 use Nette\Utils;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
@@ -14,31 +15,31 @@ class Assets
 	public const COPY = 'copy';
 	public const LESS = 'less';
 	public const SASS = 'sass';
-	public const JS = 'js';
+	public const UGLIFYJS = 'uglifyjs';
+	public const ROLLUP = 'rollup';
+
+	private const DEFAULT_SYSTEM_BIN_PATH = '/usr/bin:/bin';
 
 	/** @var array<string, mixed> */
-	private $config;
+	private array $config;
 
-	/** @var callable function (string $configFile): ?string */
-	private $readHash;
+	/** function (string $configFile): ?string */
+	private Closure $readHash;
 
-	/** @var callable function (string $configFile, string $hash): void */
-	private $writeHash;
+	/** function (string $configFile, string $hash): void */
+	private Closure $writeHash;
 
-	/** @var string */
-	private $sourceDirectory;
+	private string $sourceDirectory;
 
-	/** @var string */
-	private $destinationDirectory;
+	private string $destinationDirectory;
 
-	/** @var string */
-	private $localSourceDirectory;
+	private string $systemBinPath = self::DEFAULT_SYSTEM_BIN_PATH;
 
-	/** @var string */
-	private $configFile;
+	private ?string $localSourceDirectory = NULL;
 
-	/** @var string */
-	private $lockFile;
+	private string $configFile;
+
+	private string $lockFile;
 
 	/** @var resource */
 	private $lockHandle;
@@ -52,8 +53,8 @@ class Assets
 		string $tempDirectory,
 		string $sourceDirectory,
 		array $config,
-		callable $readHash,
-		callable $writeHash,
+		Closure $readHash,
+		Closure $writeHash,
 		array $localConfig = []
 	)
 	{
@@ -63,7 +64,9 @@ class Assets
 		$this->readHash = $readHash;
 		$this->writeHash = $writeHash;
 
-		if (isset($localConfig['localSourceDirectory'])) {
+		if (isset($localConfig['systemBinPath'])) {
+			$this->systemBinPath = trim($localConfig['systemBinPath'], ':');
+		} else if (isset($localConfig['localSourceDirectory'])) {
 			$this->localSourceDirectory = rtrim($localConfig['localSourceDirectory'], '\\/');
 		}
 
@@ -87,7 +90,7 @@ class Assets
 			$files[$item->getPathname()] = $item->getMTime();
 		}
 
-		$newHash = md5(serialize($this->config) . $this->localSourceDirectory . serialize($files));
+		$newHash = md5(serialize($this->config) . ($this->localSourceDirectory ?? '') . serialize($files));
 
 		if ($oldHash !== $newHash) {
 			$this->buildAssets(self::DEBUG);
@@ -171,11 +174,18 @@ class Assets
 					}
 					break;
 
-				case self::JS:
+				case self::UGLIFYJS:
 					if (!isset($data['files'])) {
 						throw new \InvalidArgumentException(sprintf('No files defined for \'%s\'.', $path));
 					}
 					$this->compilesJs((array) $data['files'], $path, $isDebug);
+					break;
+
+				case self::ROLLUP:
+					if (!isset($data['file'])) {
+						throw new \InvalidArgumentException(sprintf('No file defined for \'%s\'.', $path));
+					}
+					$this->compilesRollup($data['file'], $path, $isDebug);
 					break;
 			}
 		}
@@ -184,82 +194,36 @@ class Assets
 
 	private function compilesLess(string $sourceFile, string $destinationFile, bool $createMap): void
 	{
-		$sourceFileAbsolute = $this->sourceDirectory . DIRECTORY_SEPARATOR . $sourceFile;
-		$destinationFileAbsolute = $this->destinationDirectory . DIRECTORY_SEPARATOR . $destinationFile;
-
-		Utils\FileSystem::createDir(dirname($destinationFileAbsolute));
-
 		$mapCommand = '';
 		if ($createMap === TRUE) {
 			$sourceMapDirectory = dirname($this->localSourceDirectory !== NULL ? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $sourceFile) : $sourceFile);
 			$mapCommand = sprintf('--source-map --source-map-rootpath=file:///%s ', $sourceMapDirectory);
 		}
 
-		$command = sprintf('lessc --clean-css="--keepSpecialComments=0" %s%s %s 2>&1', $mapCommand, $sourceFileAbsolute, $destinationFileAbsolute);
-
-		exec($command, $output, $returnVal);
-
-		if ($returnVal !== 0) {
-			throw new Exceptions\AssetsException(sprintf('Error while compiling less (%s): %s', $command, implode(PHP_EOL, $output)));
-		}
+		$this->exec(sprintf(
+			'%s --clean-css="--keepSpecialComments=0" %s%s %s',
+			$this->npxCommand('node-sass'),
+			$mapCommand,
+			$sourceFile,
+			$this->prepareDestinationPath($destinationFile),
+		), 'css-less');
 	}
 
 
 	private function compilesSass(string $sourceFile, string $destinationDirectory, bool $createMap): void
 	{
-		$sourceFileAbsolute = $this->sourceDirectory . DIRECTORY_SEPARATOR . $sourceFile;
-		$destinationDirectoryAbsolute = $this->destinationDirectory . DIRECTORY_SEPARATOR . $destinationDirectory;
-
-		Utils\FileSystem::createDir(dirname($destinationDirectoryAbsolute));
-
 		$mapCommand = '';
 		if ($createMap === TRUE) {
-			$mapCommand = sprintf('--source-map true ');
+			$mapCommand = sprintf(' --source-map true --source-map-contents true');
 		}
 
-		$command = sprintf('node-sass %s --quiet --output-style=compressed --output="%s" %s2>&1', $sourceFileAbsolute, $destinationDirectoryAbsolute, $mapCommand);
-
-		exec($command, $output, $returnVal);
-
-		if ($returnVal !== 0) {
-			throw new Exceptions\AssetsException(sprintf('Error while compiling sass (%s): %s', $command, implode(PHP_EOL, $output)));
-		}
-
-		if ($createMap === TRUE) {
-			$sourceMapDirectory = dirname($this->localSourceDirectory !== NULL ? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $sourceFile) : $sourceFile);
-
-			$mapFile = $destinationDirectoryAbsolute . DIRECTORY_SEPARATOR . basename($sourceFileAbsolute, '.scss') . '.css.map';
-			$mapContents = file_get_contents($mapFile);
-			if ($mapContents === FALSE) {
-				throw new Exceptions\AssetsException(sprintf('Map file \'%s\' doesn\'t exists', $mapFile));
-			}
-			$json = json_decode($mapContents, TRUE);
-			foreach ($json['sources'] as $i => $source) {
-				$json['sources'][$i] = 'file:///' . $this->getAbsolutePath($sourceMapDirectory . DIRECTORY_SEPARATOR . $source);
-			}
-			file_put_contents($mapFile, json_encode($json));
-		}
-	}
-
-
-	private function getAbsolutePath(string $path): string
-	{
-		$path = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path);
-		$parts = array_filter(explode(DIRECTORY_SEPARATOR, $path), static function ($value): bool {
-			return strlen($value) > 0;
-		});
-		$absolutes = [];
-		foreach ($parts as $part) {
-			if ($part === '.') {
-				continue;
-			}
-			if ($part === '..') {
-				array_pop($absolutes);
-			} else {
-				$absolutes[] = $part;
-			}
-		}
-		return implode(DIRECTORY_SEPARATOR, $absolutes);
+		$this->exec(sprintf(
+			'%s %s --quiet --output-style=compressed --output="%s"%s',
+			$this->npxCommand('node-sass'),
+			$sourceFile,
+			$this->prepareDestinationPath($destinationDirectory),
+			$mapCommand,
+		), 'css-sass');
 	}
 
 
@@ -268,32 +232,31 @@ class Assets
 	 */
 	private function compilesJs(array $sourceFiles, string $destinationFile, bool $createMap): void
 	{
-		$destinationFile = $this->destinationDirectory . DIRECTORY_SEPARATOR . $destinationFile;
-
-		Utils\FileSystem::createDir(dirname($destinationFile));
+		$destinationFile = $this->prepareDestinationPath($destinationFile);
 
 		$mapSources = [];
 
-		array_walk($sourceFiles, function (&$file) use ($createMap, &$mapSources): void {
-			$fileRelative = $file;
-			$file = $this->sourceDirectory . DIRECTORY_SEPARATOR . $file;
-			if ($createMap === TRUE) {
-				$mapSources[$file] = 'file:///' . ($this->localSourceDirectory !== NULL ? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $fileRelative) : realpath($file));
+		if ($createMap === TRUE) {
+			foreach ($sourceFiles as $sourceFile) {
+				$sourcePath = $this->sourceDirectory . DIRECTORY_SEPARATOR . $sourceFile;
+				$mapSources[$sourcePath] = 'file:///' . ($this->localSourceDirectory !== NULL
+					? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $sourceFile)
+					: realpath($sourcePath));
 			}
-		});
+		}
 
 		$mapCommand = '';
 		if ($createMap === TRUE) {
 			$mapCommand = sprintf('--source-map url=%s.map ', basename($destinationFile));
 		}
 
-		$command = sprintf('uglifyjs %s -o %s --compress %s2>&1', implode(' ', $sourceFiles), $destinationFile, $mapCommand);
-
-		exec($command, $output, $returnVal);
-
-		if ($returnVal !== 0) {
-			throw new Exceptions\AssetsException(sprintf('Error while compiling js (%s): %s', $command, implode(PHP_EOL, $output)));
-		}
+		$this->exec(sprintf(
+			'%s %s -o %s --compress %s',
+			$this->npxCommand('uglifyjs'),
+			implode(' ', $sourceFiles),
+			$destinationFile,
+			$mapCommand,
+		), 'js-uglifyjs');
 
 		if ($createMap === TRUE) {
 			$mapFile = $destinationFile . '.map';
@@ -302,6 +265,46 @@ class Assets
 				throw new Exceptions\AssetsException(sprintf('Map file \'%s\' doesn\'t exists', $mapFile));
 			}
 			file_put_contents($mapFile, strtr($mapContents, $mapSources));
+		}
+	}
+
+
+	private function compilesRollup(string $sourceFile, string $destinationFile, bool $createMap): void
+	{
+		$this->exec(sprintf(
+			'INPUT_FILE=%s OUTPUT_FILE=%s SOURCE_MAP=%d %s -c',
+			$sourceFile,
+			$this->prepareDestinationPath($destinationFile),
+			$createMap ? 1 : 0,
+			$this->npxCommand('rollup'),
+		), 'js-rollup');
+	}
+
+
+	private function prepareDestinationPath(string $relativePath): string
+	{
+		$destinationPath = $this->destinationDirectory . DIRECTORY_SEPARATOR . $relativePath;
+
+		Utils\FileSystem::createDir(dirname($destinationPath));
+
+		return $destinationPath;
+	}
+
+
+	private function npxCommand(string $cmd): string
+	{
+		return sprintf('PATH=%s npx %s', $this->systemBinPath, $cmd);
+	}
+
+
+	private function exec(string $command, string $type): void
+	{
+		$command = sprintf('(cd %s && %s 2>&1)', $this->sourceDirectory, $command);
+
+		exec($command, $output, $returnVal);
+
+		if ($returnVal !== 0) {
+			throw new Exceptions\AssetsException(sprintf("Error while compiling %s. Command:\n\n%s\n\nError:\n\n%s", $type, $command, implode(PHP_EOL, $output)));
 		}
 	}
 

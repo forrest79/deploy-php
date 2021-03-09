@@ -8,7 +8,7 @@ Simple assets builder and application deploy helper for PHP projects.
 
 ## Requirements
 
-Forrest79/DeployPhp requires PHP 7.1 or higher.
+Forrest79/DeployPhp requires PHP 7.4 or higher.
 
 
 ## Installation
@@ -24,35 +24,42 @@ composer require --dev forrest79/deploy-php
 
 ### Assets
 
-This is simple assets builder. Currently supports copying files, compiling and minifying [less](http://lesscss.org/) files, [sass](https://sass-lang.com/) files and JavaScript files and in debug environment also generating map files.
+This is simple assets builder. Currently supports copying files, compiling and minifying [less](http://lesscss.org/) files, [sass](https://sass-lang.com/) files and JavaScript (simple minifier [UglifyJS](https://github.com/mishoo/UglifyJS) or complex [rollup.js](https://rollupjs.org/) + recommended [Babel](https://babeljs.io/)) files and in debug environment also generating map files.
 
-For compiling and minifying is required `node.js` with installed `npm` packages `less`, `node-sass` or `uglify-js`. In Debian or Ubuntu, you can do it like this:
+For compiling and minifying is required `node.js` with installed `npm` packages `less`, `node-sass`, `uglify-js` or `rollup` (`babel`) environment. In Debian or Ubuntu, you can do it like this (`-g` option install package globally in the system, not in your repository):
 
 ```bash
-curl -sL https://deb.nodesource.com/setup_10.x | sudo -E bash -
+curl -sL https://deb.nodesource.com/setup_15.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
 # LESS compiler
-sudo npm install -g less
+npm install less
+#sudo npm install -g less
 
 # SASS compiler
-sudo npm install -g --unsafe-perm node-sass
+npm install node-sass
+#sudo npm install -g node-sass
 
-# JS compiler
-sudo npm install -g uglify-js
+# UglifyJS compiler
+npm install uglify-js
+#sudo npm install -g uglify-js
+
+# Babel and Rollup (prefer not to install this globally)
+npm install rollup @rollup/plugin-node-resolve rollup-plugin-terser @rollup/plugin-babel @babel/core @babel/preset-env @babel/plugin-transform-runtime core-js
 ```
 
-Using is very simple. Examples show how this works with [Nette Framework](https://github.com/nette/nette). Just create new instance `Forrest79\DeployPhp\Assets` class and pass temp directory, assets source directory and configuration array to constructor. `key` is directory to process (for ```DeployPhp\Assets::COPY```) or target file (for ```DeployPhp\Assets::JS``` or ```DeployPhp\Assets::LESS```) or directory (for ```DeployPhp\Assets::SASS```) for source data and `value` can be simple `DeployPhp\Assets::COPY` which tells to copy this file/directory from source to destination as is or another `array` with items:
+Using is very simple. Examples show how this works with [Nette Framework](https://github.com/nette/nette). Just create new instance `Forrest79\DeployPhp\Assets` class and pass temp directory, assets source directory and configuration array to constructor. `key` is a directory to process (for ```DeployPhp\Assets::COPY```) or target file (for `DeployPhp\Assets::UGLIFYJS`, `DeployPhp\Assets::ROLLUP` or `DeployPhp\Assets::LESS`) or directory (for `DeployPhp\Assets::SASS`) for source data and `value` can be simple `DeployPhp\Assets::COPY` which tells to copy this file/directory from source to destination or another `array` with items:
 
-- required `type` - with value `DeployPhp\Assets::COPY` to copy file/directory or `DeployPhp\Assets::LESS` to compile and minify less to CSS or `DeployPhp\Assets::JS` to concatenate and minify JavaScripts
+- required `type` - with value `DeployPhp\Assets::COPY` to copy file/directory or `DeployPhp\Assets::LESS` to compile and minify less to CSS or `DeployPhp\Assets::UGLIFYJS` to concatenate and minify JavaScripts or `DeployPhp\Assets::ROLLUP` to use modern JavaScript environment
 - optional `env` - if missing, this item is proccess for debug and production environment or you can specify concrete environment `DeployPhp\Assets::DEBUG` or `DeployPhp\Assets::PRODUCTION`
 - required `file` for `type => DeployPhp\Assets::LESS` - with source file to compile and minify
 - required `file` or `files` for `type => DeployPhp\Assets::SASS` - with source file or files to compile and minify
-- required `files` for `type => DeployPhp\Assets::JS` - with source files to concatenate and minify
+- required `files` for `type => DeployPhp\Assets::UGLIFYJS` - with source files to concatenate and minify
+- required `file` for `type => DeployPhp\Assets::ROLLUP` - with source file to process (example configuration is below)
 
 Next two parameters are callable function, first is for reading hash from file and second is write hash to file. In example is shown, how you can write it to neon and use it with Nette DI.
 
-Last (fourth) parameter is optional and define array with optional settings. More about this is under example.
+Last (fourth) parameter is optional and define array with optional settings. More about this is under the example.
 
 To build assets you need first call `buildDebug($configNeon, $destinationDirectory)` or `buildProduction($configNeon, $destinationDirectory)` method.
 
@@ -60,6 +67,66 @@ To build assets you need first call `buildDebug($configNeon, $destinationDirecto
 - `$destinationDirectory` directory where assets will be built
 
 First builds assets only if there was some changed file and creates new hash from all files timestamp (and also create map files), the second builds assets everytime and creates hash from every files content.
+
+#### rollup.js environment with Babel
+
+This is modern JavaScript building configuration. You must prepare `rollup` configuration file in your assets directory:
+
+Create files `assets\rollup.config.js`:
+
+```js
+import { babel } from '@rollup/plugin-babel';
+import commonjs from '@rollup/plugin-commonjs';
+import { nodeResolve } from '@rollup/plugin-node-resolve';
+import { terser } from 'rollup-plugin-terser';
+
+const config = {
+	input: process.env.INPUT_FILE, // source file from PHP settings
+	output: [
+		{ // this compile file for old browsers
+			file: process.env.OUTPUT_FILE.replace('{format}', 'iife'), // output file from PHP settings - string {format} is replaced with iife
+			format: 'iife',
+			name: 'app',  // you can change this, it's some your identificator
+			sourcemap: !!process.env.SOURCE_MAP, // this provide source map for DEVEL and not for production
+		},
+		{ // this complie modules JS for modern browsers
+			file: process.env.OUTPUT_FILE.replace('{format}', 'esm'),
+			format: 'esm',
+			sourcemap: !!process.env.SOURCE_MAP,
+		}
+	],
+	plugins: [
+		nodeResolve(), // with this, you can import from node_modules
+		commonjs(), // this resolve require() function
+		babel({ // babel settings
+			babelHelpers: 'runtime',
+			presets: [
+				[
+					'@babel/preset-env',
+					{
+						'bugfixes': true,
+						'corejs': '3.9',
+						'targets': '>0.25%',
+						'useBuiltIns': 'usage',
+					}
+				]
+			],
+			plugins: ['@babel/plugin-transform-runtime'],
+			exclude: /\/node_modules\/core-js\//, // we must exclude core-js from being transpiled
+		}),
+		terser(), // minification
+	]
+};
+
+export default config;
+```
+
+In your HTML, you can use both files like this:
+
+```html
+<script type="text/javascript" src="/js/scripts.iife.js" nomodule defer></script>
+<script type="module" src="/js/scripts.esm.js"></script>
+```
 
 #### Example
 
@@ -104,6 +171,10 @@ return (new DeployPhp\Assets(
             'type' => DeployPhp\Assets::COPY,
             'env' => DeployPhp\Assets::DEBUG,
         ],
+		'js/scripts.{format}.js' => [ // target file - will be compiled for more formats
+			'type' => DeployPhp\Assets::ROLLUP,
+			'file' => 'js/index.js',
+		],
     ],
     static function (string $configFile): ?string {
         if (!file_exists($configFile)) {
@@ -137,6 +208,14 @@ In `deploy/assets.local.php` you can define local source assets directory, if yo
 ```php
 return [
 	'localSourceDirectory' => 'P:/app/assets',
+];
+```
+
+Or you need to specify here your local server bin directory, if differ from `/usr/bin:/bin` (directory, where is `node` binary):
+
+```php
+return [
+	'systemBinPath' => '/opt/usr/bin:/opt/bin',
 ];
 ```
 

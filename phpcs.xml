@@ -3,6 +3,7 @@
 	<rule ref="./vendor/consistence/coding-standard/Consistence/ruleset.xml">
 		<exclude name="Consistence.Exceptions.ExceptionDeclaration.IncorrectExceptionDirectory"/> <!-- We use Exceptions directory, not exceptions -->
 		<exclude name="Generic.PHP.LowerCaseConstant.Found"/>
+		<exclude name="PSR2.ControlStructures.ElseIfDeclaration.NotAllowed"/>
 		<exclude name="Squiz.Commenting.FunctionComment.MissingParamTag"/> <!-- PHPStan check this-->
 		<exclude name="Squiz.Commenting.FunctionComment.ParamNameNoMatch"/> <!-- PHPStan check this-->
 	</rule>
