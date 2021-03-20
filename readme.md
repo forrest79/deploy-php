@@ -1,7 +1,7 @@
 # Forrest79/DeployPhp
 
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://github.com/forrest79/DeployPhp/blob/master/license.md)
-[![Build Status](https://travis-ci.org/forrest79/DeployPhp.svg?branch=master)](https://travis-ci.org/forrest79/DeployPhp)
+[![Build](https://github.com/forrest79/PhpDeploy/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/forrest79/PhpDeploy/actions/workflows/build.yml)
 
 Simple assets builder and application deploy helper for PHP projects.
 
