@@ -1,6 +1,8 @@
 # Forrest79/DeployPhp
 
-[![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://github.com/forrest79/DeployPhp/blob/master/license.md)
+[![Latest Stable Version](https://poser.pugx.org/forrest79/deploy-php/v)](//packagist.org/packages/forrest79/deploy-php)
+[![Monthly Downloads](https://poser.pugx.org/forrest79/deploy-php/d/monthly)](//packagist.org/packages/forrest79/deploy-php)
+[![License](https://poser.pugx.org/forrest79/deploy-php/license)](//packagist.org/packages/forrest79/deploy-php)
 [![Build](https://github.com/forrest79/PhpDeploy/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/forrest79/PhpDeploy/actions/workflows/build.yml)
 
 Simple assets builder and application deploy helper for PHP projects.
@@ -228,7 +230,7 @@ if (PHP_SAPI !== 'cli') {
     $assetsConfigFile = __DIR__ . '/config/config.assets.neon';
     $configurator->addConfig($assetsConfigFile);
     if ($configurator->isDebugMode()) {
-        $assets = @include __DIR__ . '/../assets/assets.php'; // intentionally @ - file may not exists - good when production with production assets is running in debug mode (production preferable doesn't have assets source) 
+        $assets = @include __DIR__ . '/../assets/assets.php'; // intentionally @ - file may not exists - good when production with production assets is running in debug mode (production preferable doesn't have assets source)
         if ($assets !== FALSE) {
             $assets->buildDebug($assetsConfigFile, __DIR__ . '/../../www/assets');
         }
