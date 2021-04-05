@@ -89,12 +89,12 @@ const config = {
 			file: process.env.OUTPUT_FILE.replace('{format}', 'iife'), // output file from PHP settings - string {format} is replaced with iife
 			format: 'iife',
 			name: 'app',  // you can change this, it's some your identificator
-			sourcemap: !!process.env.SOURCE_MAP, // this provide source map for DEVEL and not for production
+			sourcemap: !!parseInt(process.env.SOURCE_MAP, 10), // this provide source map for DEVEL and not for production
 		},
 		{ // this complie modules JS for modern browsers
 			file: process.env.OUTPUT_FILE.replace('{format}', 'esm'),
 			format: 'esm',
-			sourcemap: !!process.env.SOURCE_MAP,
+			sourcemap: !!parseInt(process.env.SOURCE_MAP, 10),
 		}
 	],
 	plugins: [
