@@ -5,13 +5,6 @@ includes:
 parameters:
 	level: max
 	ignoreErrors:
-		# === phpseclib bad function anotation ===
-
-		-
-			message: '#Parameter \#2 ...\$args of method phpseclib3\\Net\\SSH2::login\(\) expects string, phpseclib3\\Crypt\\RSA\\PrivateKey given\.#'
-			path: %rootDir%/../../../src/Deploy.php
-			count: 1
-
 		# === This could never happen ===
 
 		-
