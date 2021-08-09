@@ -506,3 +506,43 @@ try {
     echo $e->getMessage() . "\n";
     exit(1);
 }
+```
+
+### Composer monorepo
+
+IF you're using monorepo for you applications, you need simple tool to prepare correct `composer.lock`. This is the simple one for repository that meets these requirements:
+- one shared global vendor directory with all libraries
+- more applications with local vendors, that on local development using the shared one and are installed on production
+
+> Be careful, using this tool is always performed update on the global composer! The next step is copy global composer to the local one and update is also performed here. After this is local vendor cleaned.
+
+> Just for hint, differences between global and locals composer.json are shown. This may not be a mistake.
+
+#### Example:
+
+```
+/apps/appA/composer.json
+/apps/appA/composer.lock
+/apps/appA/vendor (autoload.php -> /vendor/autoload.php)
+/apps/appB/composer.json
+/apps/appB/composer.lock
+/apps/appB/vendor (autoload.php -> /vendor/autoload.php)
+/vendor/autoload.php
+/vendor/[with all packages]
+composer.json
+composer.lock
+prepare-monocomposer (source is below)
+``` 
+- global vendor is committed in repository and to prepare production build, global vendor is copied to the local one and `composer install` is executed in app directory, so only needed packages are kept here
+
+```php
+#!/usr/bin/env php
+<?php declare(strict_types=1);
+
+(new Forrest79\DeployPhp\ComposerMonorepo(__DIR__ . '/composer.json', '--ignore-platform-reqs'))->updateSynchronize([
+	'appA' => __DIR__ . '/apps/appA/composer.json',
+	'appB' => __DIR__ . '/apps/appB/composer.json',
+]);
+```
+
+> Second parameter to `ComposeMonorepo` constructor is optional parameters to `composer update` command.
