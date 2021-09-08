@@ -272,7 +272,7 @@ class Deploy
 			throw new Exceptions\DeployException(sprintf('SSH can\'t load private key \'%s\'', $privateKeyFile));
 		}
 
-		// this if is for PHPStan, we can do also `Crypt\RSA::load($privateKeyContents, $passphrase ?? FALSE)` and ignora PHPStan error
+		// this if is for PHPStan, we can do also `Crypt\RSA::load($privateKeyContents, $passphrase ?? FALSE)` and ignore PHPStan error
 		$privateKey = $passphrase === NULL
 			? Crypt\RSA::load($privateKeyContents)
 			: Crypt\RSA::load($privateKeyContents, $passphrase);
