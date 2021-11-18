@@ -9,10 +9,10 @@ use phpseclib3\Net;
 
 class Deploy
 {
-	/** @var array<string, mixed> */
+	/** @var array<string, array<string, bool|float|int|string|NULL>> */
 	protected array $config = [];
 
-	/** @var array<string, mixed> */
+	/** @var array<string, array{server: string, port: int, username: string, private_key?: string, passphrase?: string}> */
 	protected array $environment;
 
 	/** @var array<string, Net\SSH2> */
@@ -124,8 +124,16 @@ class Deploy
 
 		$credentials = $this->environment['ssh'];
 
+		if ($privateKeyFile === NULL) {
+			if (isset($credentials['private_key'])) {
+				$privateKeyFile = $credentials['private_key'];
+			} else {
+				throw new Exceptions\DeployException('Private key file is not provided and no private_key is defined in environment config');
+			}
+		}
+
 		try {
-			$this->createPrivateKey($privateKeyFile ?? $credentials['private_key'], $passphrase ?? $credentials['passphrase'] ?? NULL);
+			$this->createPrivateKey($privateKeyFile, $passphrase ?? $credentials['passphrase'] ?? NULL);
 		} catch (Exception\NoKeyLoadedException $e) {
 			return FALSE;
 		}

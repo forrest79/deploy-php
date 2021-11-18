@@ -7,6 +7,9 @@ use Nette\Utils;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 
+/**
+ * @phpstan-type AssetsConfig array<string, array{type: string|NULL, file: string|NULL, files: array<string>|NULL, env: string|NULL}|string>
+ */
 class Assets
 {
 	public const DEBUG = 'debug';
@@ -20,7 +23,7 @@ class Assets
 
 	private const DEFAULT_SYSTEM_BIN_PATH = '/usr/bin:/bin';
 
-	/** @var array<string, mixed> */
+	/** @phpstan-var AssetsConfig */
 	private array $config;
 
 	/** function (string $configFile): ?string */
@@ -46,7 +49,7 @@ class Assets
 
 
 	/**
-	 * @param array<string, mixed> $config
+	 * @phpstan-param AssetsConfig $config
 	 * @param array<string, string> $localConfig
 	 */
 	public function __construct(
@@ -143,21 +146,22 @@ class Assets
 		$isDebug = $environment === self::DEBUG;
 
 		foreach ($this->config as $path => $data) {
-			if (is_array($data) && isset($data['env']) && ($data['env'] !== $environment)) {
+			if ($data === self::COPY) {
+				Utils\FileSystem::copy($this->sourceDirectory . DIRECTORY_SEPARATOR . $path, $this->destinationDirectory . DIRECTORY_SEPARATOR . $path);
 				continue;
 			}
 
-			if (is_array($data) && !isset($data['type'])) {
-				throw new \InvalidArgumentException(sprintf('Path \'%s\' has no type defined.', $data['type']));
+			assert(is_array($data));
+
+			if (isset($data['env']) && ($data['env'] !== $environment)) {
+				continue;
 			}
 
-			$type = is_array($data) ? $data['type'] : $data;
+			if (!isset($data['type'])) {
+				throw new \InvalidArgumentException(sprintf('Path \'%s\' has no type defined.', $path));
+			}
 
-			switch ($type) {
-				case self::COPY:
-					Utils\FileSystem::copy($this->sourceDirectory . DIRECTORY_SEPARATOR . $path, $this->destinationDirectory . DIRECTORY_SEPARATOR . $path);
-					break;
-
+			switch ($data['type']) {
 				case self::LESS:
 					if (!isset($data['file'])) {
 						throw new \InvalidArgumentException(sprintf('No file defined for \'%s\'.', $path));
@@ -170,6 +174,7 @@ class Assets
 						throw new \InvalidArgumentException(sprintf('No file or files defined for \'%s\'.', $path));
 					}
 					foreach ($data['files'] ?? [$data['file']] as $file) {
+						assert($file !== NULL);
 						$this->compilesSass($file, $path, $isDebug);
 					}
 					break;
@@ -178,7 +183,7 @@ class Assets
 					if (!isset($data['files'])) {
 						throw new \InvalidArgumentException(sprintf('No files defined for \'%s\'.', $path));
 					}
-					$this->compilesJs((array) $data['files'], $path, $isDebug);
+					$this->compilesJs($data['files'], $path, $isDebug);
 					break;
 
 				case self::ROLLUP:
@@ -313,9 +318,9 @@ class Assets
 	{
 		$handle = @fopen($this->lockFile, 'c+'); // intentionally @
 		if ($handle === FALSE) {
-			throw new Exceptions\AssetsException(sprintf('Unable to create file \'%s\' %s', $this->lockFile, error_get_last()['message']));
+			throw new Exceptions\AssetsException(sprintf('Unable to create file \'%s\' %s', $this->lockFile, error_get_last()['message'] ?? 'unknown'));
 		} elseif (!@flock($handle, LOCK_EX)) { // intentionally @
-			throw new Exceptions\AssetsException(sprintf('Unable to acquire exclusive lock on \'%s\' %s', $this->lockFile, error_get_last()['message']));
+			throw new Exceptions\AssetsException(sprintf('Unable to acquire exclusive lock on \'%s\' %s', $this->lockFile, error_get_last()['message'] ?? 'unknown'));
 		}
 		$this->lockHandle = $handle;
 

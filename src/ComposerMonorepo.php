@@ -13,7 +13,7 @@ class ComposerMonorepo
 
 	private ?string $gitUpdateParameters;
 
-	/** @var array<string, mixed> */
+	/** @var array{require: array<string>} */
 	private array $globalComposerJson;
 
 
@@ -28,7 +28,9 @@ class ComposerMonorepo
 		$this->globalComposerJsonFile = $globalComposerJsonFile;
 		$this->gitUpdateParameters = $gitUpdateParameters;
 
-		$this->globalComposerJson = json_decode($globalComposer, TRUE);
+		/** @var array{require: array<string>} $globalComposerJson */
+		$globalComposerJson = json_decode($globalComposer, TRUE); // assign to variable is because of phpstan
+		$this->globalComposerJson = $globalComposerJson;
 	}
 
 
@@ -60,6 +62,7 @@ class ComposerMonorepo
 		echo self::COLOR_GREEN . strtoupper($appName) . ':' . self::COLOR_RESET . PHP_EOL . PHP_EOL;
 
 		$localComposer = json_decode($localComposer, TRUE);
+		assert(is_array($localComposer));
 
 		self::composerDiff($localComposerFile, 'Local', array_diff_assoc($this->globalComposerJson['require'], $localComposer['require']), FALSE);
 		self::composerDiff($localComposerFile, 'Global', array_diff_assoc($localComposer['require'], $this->globalComposerJson['require']), TRUE);
