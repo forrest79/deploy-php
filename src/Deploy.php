@@ -269,7 +269,13 @@ class Deploy
 
 	private function sshExec(Net\SSH2 $sshConnection, string $command): string
 	{
-		return $sshConnection->exec($command);
+		$result = $sshConnection->exec($command);
+		if ($result === FALSE) {
+			throw new Exceptions\DeployException(sprintf('SSH command \'%s\' failed', $command));
+		}
+
+		assert(\is_string($result));
+		return $result;
 	}
 
 
