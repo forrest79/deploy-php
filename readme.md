@@ -301,7 +301,7 @@ class Extension extends CompilerExtension
 In your application, you can use hash as query parameter ```styles.css?hash``` or as virtual path in web server, example for nginx, load assets at path ```/assets/hash/styles.css```:
 
 ```
-location ~ ^/assets/ {
+location /assets/ {
     expires 7d;
     rewrite ^/assets/[a-z0-9]+/(.+)$ /assets/$1 break;
 }
