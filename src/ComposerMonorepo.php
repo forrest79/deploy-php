@@ -47,8 +47,8 @@ class ComposerMonorepo
 
 	private function synchronizeApp(string $appName, string $localComposerFile): void
 	{
-		$localComposer = @file_get_contents($localComposerFile);
-		if ($localComposer === FALSE) {
+		$localComposerData = @file_get_contents($localComposerFile);
+		if ($localComposerData === FALSE) {
 			echo self::COLOR_RED . sprintf('No local composer.json (%s).', $localComposerFile) . self::COLOR_RESET . PHP_EOL;
 			exit(1);
 		}
@@ -61,8 +61,8 @@ class ComposerMonorepo
 
 		echo self::COLOR_GREEN . strtoupper($appName) . ':' . self::COLOR_RESET . PHP_EOL . PHP_EOL;
 
-		$localComposer = json_decode($localComposer, TRUE);
-		assert(is_array($localComposer));
+		/** @var array{require: array<string>} $localComposer */
+		$localComposer = json_decode($localComposerData, TRUE);
 
 		self::composerDiff($localComposerFile, 'Local', array_diff_assoc($this->globalComposerJson['require'], $localComposer['require']), FALSE);
 		self::composerDiff($localComposerFile, 'Global', array_diff_assoc($localComposer['require'], $this->globalComposerJson['require']), TRUE);

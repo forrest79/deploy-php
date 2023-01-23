@@ -8,7 +8,7 @@ use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 
 /**
- * @phpstan-type AssetsConfig array<string, array{type: string|NULL, file: string|NULL, files: array<string>|NULL, env: string|NULL}|string>
+ * @phpstan-type AssetsConfig array<string, array{type: string|NULL, file?: string|NULL, files?: array<string>, env?: string}|string>
  */
 class Assets
 {
@@ -87,6 +87,7 @@ class Assets
 
 		$files = [];
 		foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->sourceDirectory, RecursiveDirectoryIterator::SKIP_DOTS)) as $item) {
+			assert($item instanceof \SplFileInfo);
 			if ($item->isDir() || (realpath($item->getPathname()) === $lockFile)) {
 				continue;
 			}
@@ -114,6 +115,7 @@ class Assets
 
 		$contents = '';
 		foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->sourceDirectory, RecursiveDirectoryIterator::SKIP_DOTS)) as $item) {
+			assert($item instanceof \SplFileInfo);
 			if ($item->isDir() || (realpath($item->getPathname()) === $lockFile)) {
 				continue;
 			}

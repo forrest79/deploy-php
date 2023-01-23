@@ -100,7 +100,7 @@ class Deploy
 	protected function exec(string $command, &$stdout = FALSE): bool
 	{
 		exec($command, $output, $return);
-		if ($output && ($stdout !== FALSE)) {
+		if (($output !== []) && ($stdout !== FALSE)) {
 			$stdout = implode(PHP_EOL, $output);
 		}
 		return $return === 0;
