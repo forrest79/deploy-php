@@ -2,19 +2,11 @@
 <ruleset name="DeployPhp">
 	<rule ref="./vendor/forrest79/phpcs/Forrest79CodingStandard/ruleset.xml"/>
 
-	<rule ref="SlevomatCodingStandard.Classes.RequireAbstractOrFinal.ClassNeitherAbstractNorFinal">
-		<exclude-pattern>src/*</exclude-pattern>
-	</rule>
-
 	<rule ref="SlevomatCodingStandard.Files.TypeNameMatchesFileName">
 		<properties>
 			<property name="rootNamespaces" type="array" value="
 				src=>Forrest79\DeployPhp,
 			"/>
 		</properties>
-	</rule>
-
-	<rule ref="SlevomatCodingStandard.TypeHints.ParameterTypeHint.MissingNativeTypeHint">
-		<exclude-pattern>src/Deploy.php</exclude-pattern>
 	</rule>
 </ruleset>
