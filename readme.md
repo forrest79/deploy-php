@@ -10,7 +10,7 @@ Simple assets builder and application deploy helper for PHP projects.
 
 ## Requirements
 
-Forrest79/DeployPhp requires PHP 7.4 or higher.
+Forrest79/DeployPhp requires PHP 8.0 or higher.
 
 
 ## Installation
@@ -26,7 +26,7 @@ composer require --dev forrest79/deploy-php
 
 ### Assets
 
-This is simple assets builder. Currently supports copying files, compiling and minifying [less](http://lesscss.org/) files, [sass](https://sass-lang.com/) files and JavaScript (simple minifier [UglifyJS](https://github.com/mishoo/UglifyJS) or complex [rollup.js](https://rollupjs.org/) + recommended [Babel](https://babeljs.io/)) files and in debug environment also generating map files.
+This is a simple assets builder. Currently, it supports copying files, compiling and minifying [less](http://lesscss.org/) files, [sass](https://sass-lang.com/) files and JavaScript (simple minifier [UglifyJS](https://github.com/mishoo/UglifyJS) or complex [rollup.js](https://rollupjs.org/) + recommended [Babel](https://babeljs.io/)) files and in debug environment also generating map files.
 
 For compiling and minifying is required `node.js` with installed `npm` packages `less`, `node-sass`, `uglify-js` or `rollup` (`babel`) environment. In Debian or Ubuntu, you can do it like this (`-g` option install package globally in the system, not in your repository):
 
@@ -50,7 +50,7 @@ npm install uglify-js
 npm install rollup @rollup/plugin-node-resolve @rollup/plugin-commonjs rollup-plugin-terser @rollup/plugin-babel @babel/core @babel/preset-env @babel/plugin-transform-runtime core-js
 ```
 
-Using is very simple. Examples show how this works with [Nette Framework](https://github.com/nette/nette). Just create new instance `Forrest79\DeployPhp\Assets` class and pass temp directory, assets source directory and configuration array to constructor. `key` is a directory to process (for ```DeployPhp\Assets::COPY```) or target file (for `DeployPhp\Assets::UGLIFYJS`, `DeployPhp\Assets::ROLLUP` or `DeployPhp\Assets::LESS`) or directory (for `DeployPhp\Assets::SASS`) for source data and `value` can be simple `DeployPhp\Assets::COPY` which tells to copy this file/directory from source to destination or another `array` with items:
+Using is straightforward. Examples show how this works with [Nette Framework](https://github.com/nette/nette). Just create new instance `Forrest79\DeployPhp\Assets` class and pass temp directory, assets source directory and configuration array to constructor. `key` is a directory to process (for ```DeployPhp\Assets::COPY```) or target file (for `DeployPhp\Assets::UGLIFYJS`, `DeployPhp\Assets::ROLLUP` or `DeployPhp\Assets::LESS`) or directory (for `DeployPhp\Assets::SASS`) for source data and `value` can be simple `DeployPhp\Assets::COPY` which tells to copy this file/directory from source to destination or another `array` with items:
 
 - required `type` - with value `DeployPhp\Assets::COPY` to copy file/directory or `DeployPhp\Assets::LESS` to compile and minify less to CSS or `DeployPhp\Assets::UGLIFYJS` to concatenate and minify JavaScripts or `DeployPhp\Assets::ROLLUP` to use modern JavaScript environment
 - optional `env` - if missing, this item is processed for debug and production environment, or you can specify concrete environment `DeployPhp\Assets::DEBUG` or `DeployPhp\Assets::PRODUCTION`
@@ -59,16 +59,16 @@ Using is very simple. Examples show how this works with [Nette Framework](https:
 - required `files` for `type => DeployPhp\Assets::UGLIFYJS` - with source files to concatenate and minify
 - required `file` for `type => DeployPhp\Assets::ROLLUP` - with source file to process (example configuration is below)
 
-Next two parameters are callable function, first is for reading hash from file and second is write hash to file. In example is shown, how you can write it to neon and use it with Nette DI.
+The next two parameters are callable function, the first is for reading hash from file, and the second is to write hash to file. In example is shown, how you can write it to neon and use it with Nette DI.
 
-Last (fourth) parameter is optional and define array with optional settings. More about this is under the example.
+Last (fourth) parameter is optional and define an array with optional settings. More about this is under the example.
 
 To build assets you need first call `buildDebug($configNeon, $destinationDirectory)` or `buildProduction($configNeon, $destinationDirectory)` method.
 
 - `$configFile`  file where will be stored actual assets hash that you can use in your application
 - `$destinationDirectory` directory where assets will be built
 
-First builds assets only if there was some changed file and creates new hash from all files timestamp (and also create map files), the second builds assets everytime and creates hash from every files content.
+First builds assets only if there was some changed file and creates new hash from all files timestamps (and also create map files), the second builds assets every time and creates hash from every file content.
 
 #### rollup.js environment with Babel
 
@@ -205,7 +205,7 @@ parameters:
         hash: c11a678785091b7f1334c24a4123ee75 # md5 hash (32 characters)
 ```
 
-In `deploy/assets.local.php` you can define local source assets directory, if you're using some virtual server, where the paths are different from your host paths. This directory will be used for JS and CSS map files to property open source files in browser console:
+In `deploy/assets.local.php` you can define local source assets directory, if you're using some virtual server, where the paths are different from your host paths. This directory will be used for JS and CSS map files to property open source files in the browser console:
 
 ```php
 return [
@@ -242,9 +242,9 @@ $configurator->addConfig(__DIR__ . '/config/config.local.neon');
 $container = $configurator->createContainer();
 ```
 
-In debug mode is hash calculated from every assets files timestamp - creating hash is fast (if you change file or add/remove some file, hash is changed and assets are automatically rebuilt before request is performed).
+In debug mode, hash is calculated from every assets file timestamp - creating hash is fast (if you change file or add/remove some file, hash is changed and assets are automatically rebuilt before the request is performed).
 
-In Nette you need to define you own Assets extension, that will read hash from ```assets.hash``` and with some sort of service, you can use it in your application. For example, like this:
+In Nette, you need to define you own Assets extension, that will read hash from ```assets.hash``` and with some sort of service, you can use it in your application. For example, like this:
 
 ```php
 // Service to use in application
@@ -315,12 +315,12 @@ $assets = require __DIR__ . '/assets.php';
 $assets->buildProduction($releaseBuildDirectory . '/app/config/config.assets.neon', $releaseBuildDirectory . '/www/assets')
 ```
 
-Hash is computed from all files content, so hash is changed only when some file content is changed or same file is add/remove (creating hash is slow).
+Hash is computed from all file content, so hash is changed only when some file content is changed or the same file is added/remove (creating hash is slow).
 
 
 ### Build and deploy
 
-Contains just some helper methods to checkout from GIT, copy files via SFTP a run commands via SSH. For documentation look at example.
+Contains just some helper methods to checkout from GIT, copy files via SFTP, and run commands via SSH. For documentation look at example.
 
 #### Example
 
@@ -510,9 +510,9 @@ try {
 
 ### Composer monorepo
 
-IF you're using monorepo for you applications, you need simple tool to prepare correct `composer.lock`. This is the simple one for repository that meets these requirements:
+IF you're using monorepo for you applications, you need simple tool to prepare correct `composer.lock`. This is the simple one for a repository that meets these requirements:
 - one shared global vendor directory with all libraries
-- more applications with local vendors, that on local development using the shared one and are installed on production
+- more applications with local vendors that on local development using the shared one and are installed on production
 
 > Be careful, using this tool is always performed update on the global composer! The next step is copy global composer to the local one and update is also performed here. After this is local vendor cleaned.
 
@@ -533,7 +533,7 @@ composer.json
 composer.lock
 prepare-monocomposer (source is below)
 ``` 
-- global vendor is committed in repository and to prepare production build, global vendor is copied to the local one and `composer install` is executed in app directory, so only needed packages are kept here
+- global vendor is committed in repository and to prepare production build, global vendor is copied to the local one and `composer install` is executed in the app directory, so only needed packages are kept here
 
 ```php
 #!/usr/bin/env php

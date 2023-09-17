@@ -38,7 +38,7 @@ class Assets
 
 	private string $systemBinPath = self::DEFAULT_SYSTEM_BIN_PATH;
 
-	private ?string $localSourceDirectory = NULL;
+	private string|NULL $localSourceDirectory = NULL;
 
 	private string $configFile;
 
@@ -58,7 +58,7 @@ class Assets
 		array $config,
 		Closure $readHash,
 		Closure $writeHash,
-		array $localConfig = []
+		array $localConfig = [],
 	)
 	{
 		$this->sourceDirectory = rtrim($sourceDirectory, '\\/');
@@ -221,7 +221,7 @@ class Assets
 	{
 		$mapCommand = '';
 		if ($createMap === TRUE) {
-			$mapCommand = sprintf(' --source-map true --source-map-contents true');
+			$mapCommand = ' --source-map true --source-map-contents true';
 		}
 
 		$this->exec(sprintf(

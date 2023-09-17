@@ -94,10 +94,7 @@ class Deploy
 	}
 
 
-	/**
-	 * @param string|FALSE $stdout
-	 */
-	protected function exec(string $command, &$stdout = FALSE): bool
+	protected function exec(string $command, string|FALSE &$stdout = FALSE): bool
 	{
 		exec($command, $output, $return);
 		if (($output !== []) && ($stdout !== FALSE)) {
@@ -116,7 +113,7 @@ class Deploy
 	}
 
 
-	protected function validatePrivateKey(?string $privateKeyFile = NULL, ?string $passphrase = NULL): bool
+	protected function validatePrivateKey(string|NULL $privateKeyFile = NULL, string|NULL $passphrase = NULL): bool
 	{
 		if (($privateKeyFile === NULL) && ($passphrase !== NULL)) {
 			throw new Exceptions\DeployException('Can\'t provide passphrase without private key file');
@@ -134,7 +131,7 @@ class Deploy
 
 		try {
 			$this->createPrivateKey($privateKeyFile, $passphrase ?? $credentials['passphrase'] ?? NULL);
-		} catch (Exception\NoKeyLoadedException $e) {
+		} catch (Exception\NoKeyLoadedException) {
 			return FALSE;
 		}
 
@@ -144,10 +141,10 @@ class Deploy
 
 	protected function ssh(
 		string $command,
-		?string $validate = NULL,
-		?string &$output = NULL,
-		?string $host = NULL,
-		?int $port = NULL
+		string|NULL $validate = NULL,
+		string|NULL &$output = NULL,
+		string|NULL $host = NULL,
+		int|NULL $port = NULL,
 	): bool
 	{
 		$output = $this->sshExec($this->sshConnection(Net\SSH2::class, $host, $port), $command . ';echo "[return_code:$?]"');
@@ -161,7 +158,7 @@ class Deploy
 		}
 
 		if ($validate !== NULL) {
-			$success = strpos($output ?? '', $validate) !== FALSE;
+			$success = str_contains($output ?? '', $validate);
 			if (!$success) {
 				$this->log(sprintf('SSH validation error: "%s" doesn\'t contains "%s"', $output, $validate));
 			}
@@ -175,8 +172,8 @@ class Deploy
 	protected function sftpPut(
 		string $localFile,
 		string $remoteDirectory,
-		?string $host = NULL,
-		?int $port = NULL
+		string|NULL $host = NULL,
+		int|NULL $port = NULL,
 	): bool
 	{
 		$remoteDirectory = rtrim($remoteDirectory, '/');
@@ -185,14 +182,14 @@ class Deploy
 		assert($sftp instanceof Net\SFTP);
 
 		$this->sshExec($sftp, 'mkdir -p ' . $remoteDirectory); // create remote directory if doesn't
-		$remoteAbsoluteDirectory = (substr($remoteDirectory, 0, 1) === '/') ? $remoteDirectory : (trim($this->sshExec($sftp, 'pwd')) . '/' . $remoteDirectory);
+		$remoteAbsoluteDirectory = (str_starts_with($remoteDirectory, '/')) ? $remoteDirectory : (trim($this->sshExec($sftp, 'pwd')) . '/' . $remoteDirectory);
 		$remoteFile = $remoteAbsoluteDirectory . '/' . basename($localFile);
 
 		return $sftp->put($remoteFile, $localFile, Net\SFTP::SOURCE_LOCAL_FILE);
 	}
 
 
-	protected function httpRequest(string $url, ?string $validate = NULL): bool
+	protected function httpRequest(string $url, string|NULL $validate = NULL): bool
 	{
 		$curl = curl_init($url);
 		if ($curl === FALSE) {
@@ -211,14 +208,14 @@ class Deploy
 			if (!is_string($returned)) {
 				return FALSE;
 			}
-			return strpos($returned, $validate) !== FALSE;
+			return str_contains($returned, $validate);
 		}
 
 		return $errorNo === 0;
 	}
 
 
-	protected function error(?string $message = NULL): void
+	protected function error(string|NULL $message = NULL): void
 	{
 		throw new Exceptions\DeployException($message ?? '');
 	}
@@ -231,9 +228,9 @@ class Deploy
 
 
 	/**
-	 * @param class-string $class
+	 * @param class-string<Net\SSH2> $class
 	 */
-	private function sshConnection(string $class, ?string $host, ?int $port): Net\SSH2
+	private function sshConnection(string $class, string|NULL $host, int|NULL $port): Net\SSH2
 	{
 		if ($host === NULL) {
 			$host = $this->environment['ssh']['server'];
@@ -248,7 +245,6 @@ class Deploy
 
 		if (!isset($this->sshConnections[$key])) {
 			$sshConnection = new $class($host, $port, 0);
-			assert($sshConnection instanceof Net\SSH2);
 
 			if (isset($credentials['private_key'])) {
 				$privateKey = $this->createPrivateKey($credentials['private_key'], $credentials['passphrase'] ?? NULL);
@@ -274,12 +270,12 @@ class Deploy
 			throw new Exceptions\DeployException(sprintf('SSH command \'%s\' failed', $command));
 		}
 
-		assert(\is_string($result));
+		assert(is_string($result));
 		return $result;
 	}
 
 
-	private function createPrivateKey(string $privateKeyFile, ?string $passphrase): Crypt\RSA\PrivateKey
+	private function createPrivateKey(string $privateKeyFile, string|NULL $passphrase): Crypt\RSA\PrivateKey
 	{
 		$privateKeyContents = file_get_contents($privateKeyFile);
 		if ($privateKeyContents === FALSE) {
@@ -330,9 +326,7 @@ class Deploy
 				throw new Exceptions\DeployException('Hidden response aborted.');
 			}
 
-			$value = trim($value);
-
-			return $value;
+			return trim($value);
 		}
 
 		$shell = self::getShell();
@@ -350,7 +344,7 @@ class Deploy
 	}
 
 
-	private static function getShell(): ?string
+	private static function getShell(): string|NULL
 	{
 		$shell = NULL;
 

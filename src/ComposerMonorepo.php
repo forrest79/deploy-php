@@ -11,13 +11,13 @@ class ComposerMonorepo
 
 	private string $globalComposerJsonFile;
 
-	private ?string $gitUpdateParameters;
+	private string|NULL $gitUpdateParameters;
 
 	/** @var array{require: array<string>} */
 	private array $globalComposerJson;
 
 
-	public function __construct(string $globalComposerJsonFile, ?string $gitUpdateParameters = NULL)
+	public function __construct(string $globalComposerJsonFile, string|NULL $gitUpdateParameters = NULL)
 	{
 		$globalComposer = @file_get_contents($globalComposerJsonFile);
 		if ($globalComposer === FALSE) {
@@ -55,7 +55,7 @@ class ComposerMonorepo
 
 		$appDir = realpath(dirname($localComposerFile));
 		if ($appDir === FALSE) {
-			echo self::COLOR_RED . sprintf('App directory \'%s\' not exists.', $appDir) . self::COLOR_RESET . PHP_EOL;
+			echo self::COLOR_RED . sprintf('App directory \'%s\' not exists.', dirname($localComposerFile)) . self::COLOR_RESET . PHP_EOL;
 			exit(1);
 		}
 
