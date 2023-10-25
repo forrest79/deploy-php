@@ -3,7 +3,7 @@
 [![Latest Stable Version](https://poser.pugx.org/forrest79/deploy-php/v)](//packagist.org/packages/forrest79/deploy-php)
 [![Monthly Downloads](https://poser.pugx.org/forrest79/deploy-php/d/monthly)](//packagist.org/packages/forrest79/deploy-php)
 [![License](https://poser.pugx.org/forrest79/deploy-php/license)](//packagist.org/packages/forrest79/deploy-php)
-[![Build](https://github.com/forrest79/PhpDeploy/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/forrest79/PhpDeploy/actions/workflows/build.yml)
+[![Build](https://github.com/forrest79/deploy-php/actions/workflows/build.yml/badge.svg?branch=master)](https://github.com/forrest79/deploy-php/actions/workflows/build.yml)
 
 Simple assets builder and application deploy helper for PHP projects.
 
