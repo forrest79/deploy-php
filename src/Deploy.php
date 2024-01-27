@@ -9,7 +9,7 @@ use phpseclib3\Net;
 
 class Deploy
 {
-	/** @var array<string, array<string, bool|float|int|string|NULL>> */
+	/** @var array<string, array<string, bool|float|int|string|array<mixed>|NULL>> */
 	protected array $config = [];
 
 	/** @var array<string, array{server: string, port: int, username: string, private_key?: string, passphrase?: string}> */
