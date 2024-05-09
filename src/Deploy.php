@@ -235,6 +235,7 @@ class Deploy
 		if ($host === NULL) {
 			$host = $this->environment['ssh']['server'];
 		}
+
 		if ($port === NULL) {
 			$port = $this->environment['ssh']['port'] ?? 22;
 		}
