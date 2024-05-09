@@ -260,26 +260,13 @@ class Deploy
 		}
 
 		if (!isset($this->sshConnections[$key])) {
-			$sshConnection = self::createSshConnection($class, $host, $port);
+			$sshConnection = new $class($host, $port, 0);
 
 			$isConnectedByAgent = FALSE;
 			$sshAgent = NULL;
 			if (isset($credentials['ssh_agent']) && (bool) $credentials['ssh_agent']) {
 				$sshAgent = new System\SSH\Agent($credentials['ssh_agent'] === TRUE ? NULL : $credentials['ssh_agent']);
-
-				/**
-				 * Temporary till Net\SSH2 will be fixed in phpseclib - every login attempt should have reset algorithms.
-				 *
-				 * Then use: `$isConnectedByAgent = $sshConnection->login($credentials['username'], $sshAgent);`
-				 */
-				foreach ($sshAgent->requestIdentities() as $privateKey) {
-					$isConnectedByAgent = $sshConnection->login($credentials['username'], $privateKey);
-					if ($isConnectedByAgent) {
-						break;
-					}
-
-					$sshConnection = self::createSshConnection($class, $host, $port);
-				}
+				$isConnectedByAgent = $sshConnection->login($credentials['username'], $sshAgent);
 			}
 
 			if (!$isConnectedByAgent) {
@@ -309,17 +296,6 @@ class Deploy
 		}
 
 		return $this->sshConnections[$key];
-	}
-
-
-	/**
-	 * Temporary till Net\SSH2 will be fixed in phpseclib - every login attempt should have reset algorithms.
-	 *
-	 * @param class-string<Net\SSH2> $class
-	 */
-	private static function createSshConnection(string $class, string|NULL $host, int|NULL $port): Net\SSH2
-	{
-		return new $class($host, $port, 0);
 	}
 
 
