@@ -6,13 +6,17 @@ use Nette\Utils;
 use phpseclib3\Crypt;
 use phpseclib3\Exception;
 use phpseclib3\Net;
+use phpseclib3\System;
 
+/**
+ * @phpstan-type EnvironmentType array{server: string, port: int, username: string, private_key?: string, passphrase?: string|callable(static, string): (string|NULL)|NULL, ssh_agent?: string|bool}
+ */
 class Deploy
 {
 	/** @var array<string, array<string, bool|float|int|string|array<mixed>|NULL>> */
 	protected array $config = [];
 
-	/** @var array<string, array{server: string, port: int, username: string, private_key?: string, passphrase?: string}> */
+	/** @var array<string, EnvironmentType> */
 	protected array $environment;
 
 	/** @var array<string, Net\SSH2> */
@@ -113,7 +117,7 @@ class Deploy
 	}
 
 
-	protected function validatePrivateKey(string|NULL $privateKeyFile = NULL, string|NULL $passphrase = NULL): bool
+	public function validatePrivateKey(string|NULL $privateKeyFile = NULL, string|NULL $passphrase = NULL): bool
 	{
 		if (($privateKeyFile === NULL) && ($passphrase !== NULL)) {
 			throw new Exceptions\DeployException('Can\'t provide passphrase without private key file');
@@ -129,8 +133,13 @@ class Deploy
 			}
 		}
 
+		$passphrase ??= $credentials['passphrase'] ?? NULL;
+		if (is_callable($passphrase)) {
+			throw new Exceptions\DeployException('Private key can\'t be validated with callable passphrase');
+		}
+
 		try {
-			$this->createPrivateKey($privateKeyFile, $passphrase ?? $credentials['passphrase'] ?? NULL);
+			$this->createPrivateKey($privateKeyFile, $passphrase);
 		} catch (Exception\NoKeyLoadedException) {
 			return FALSE;
 		}
@@ -235,7 +244,6 @@ class Deploy
 		if ($host === NULL) {
 			$host = $this->environment['ssh']['server'];
 		}
-
 		if ($port === NULL) {
 			$port = $this->environment['ssh']['port'] ?? 22;
 		}
@@ -252,22 +260,66 @@ class Deploy
 		}
 
 		if (!isset($this->sshConnections[$key])) {
-			$sshConnection = new $class($host, $port, 0);
+			$sshConnection = self::createSshConnection($class, $host, $port);
 
-			if (isset($credentials['private_key'])) {
-				$privateKey = $this->createPrivateKey($credentials['private_key'], $credentials['passphrase'] ?? NULL);
+			$isConnectedByAgent = FALSE;
+			$sshAgent = NULL;
+			if (isset($credentials['ssh_agent']) && (bool) $credentials['ssh_agent']) {
+				$sshAgent = new System\SSH\Agent($credentials['ssh_agent'] === TRUE ? NULL : $credentials['ssh_agent']);
 
-				if (!$sshConnection->login($credentials['username'], $privateKey)) {
-					throw new Exceptions\DeployException(sprintf('SSH can\'t authenticate with private key \'%s\'', $credentials['private_key']));
+				/**
+				 * Temporary till Net\SSH2 will be fixed in phpseclib - every login attempt should have reset algorithms.
+				 *
+				 * Then use: `$isConnectedByAgent = $sshConnection->login($credentials['username'], $sshAgent);`
+				 */
+				foreach ($sshAgent->requestIdentities() as $privateKey) {
+					$isConnectedByAgent = $sshConnection->login($credentials['username'], $privateKey);
+					if ($isConnectedByAgent) {
+						break;
+					}
+
+					$sshConnection = self::createSshConnection($class, $host, $port);
 				}
-			} else {
-				throw new Exceptions\DeployException('Unsupported authentication type for SSH.');
+			}
+
+			if (!$isConnectedByAgent) {
+				if (isset($credentials['private_key'])) {
+					$passphrase = NULL;
+					if (isset($credentials['passphrase'])) {
+						if (is_callable($credentials['passphrase'])) {
+							$passphrase = call_user_func($credentials['passphrase'], $this, $credentials['private_key']);
+							$this->environment['ssh']['passphrase'] = $passphrase;
+						} else {
+							$passphrase = $credentials['passphrase'];
+						}
+						assert($passphrase === NULL || is_string($passphrase));
+					}
+
+					$privateKey = $this->createPrivateKey($credentials['private_key'], $passphrase);
+					$sshConnection = new $class($host, $port, 0);
+					if (!$sshConnection->login($credentials['username'], $privateKey)) {
+						throw new Exceptions\DeployException(sprintf('SSH can\'t authenticate with private key \'%s\'%s', $credentials['private_key'], $sshAgent === NULL ? '' : ' (ssh-agent was also tried)'));
+					}
+				} else {
+					throw new Exceptions\DeployException('Unsupported authentication type for SSH.');
+				}
 			}
 
 			$this->sshConnections[$key] = $sshConnection;
 		}
 
 		return $this->sshConnections[$key];
+	}
+
+
+	/**
+	 * Temporary till Net\SSH2 will be fixed in phpseclib - every login attempt should have reset algorithms.
+	 *
+	 * @param class-string<Net\SSH2> $class
+	 */
+	private static function createSshConnection(string $class, string|NULL $host, int|NULL $port): Net\SSH2
+	{
+		return new $class($host, $port, 0);
 	}
 
 

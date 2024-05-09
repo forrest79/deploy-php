@@ -330,14 +330,15 @@ use Forrest79\DeployPhp;
 require __DIR__ . '/../vendor/autoload.php';
 
 //define('SSH_PRIVATE_KEY', 'define-this-in-deploy.local.php');
+//define('SSH_AGENT_SOCK', 'define-this-in-deploy.local.php');
 //define('DEPLOY_TEMP_DIRECTORY', 'define-this-in-deploy.local.php'); // if you want to change from default repository temp - on VirtualBox is recommended /tmp/... or some local (not shared) directory
 
 require __DIR__ . '/deploy.local.php';
 
 class Deploy extends DeployPhp\Deploy
 {
-    /** @var array */
-    protected $config = [
+    /** @var array<string, array<string, bool|float|int|string|array<mixed>|NULL>> */
+    protected array $config = [
         'vps' => [
             'gitBranch' => 'master',
             'ssh' => [
@@ -345,23 +346,20 @@ class Deploy extends DeployPhp\Deploy
                 'directory' => '/var/www/site.com',
                 'username' => 'forrest79',
                 'private_key' => 'C:\\Certificates\\certificate',
-                'passphrase' => NULL,
+                'passphrase' => NULL, // is completed dynamically - if needed (agent is tried at first), can be also callback call when password is needed
+				'ssh_agent' => SSH_AGENT_SOCK, // TRUE - try to read from env variable, string - socket file
             ],
             'deployScript' => 'https://www.site.com/deploy.php',
         ]
     ];
 
-    /** @var string */
-    private $releasesDirectory;
+    private string $releasesDirectory;
 
-    /** @var string */
-    private $releaseName;
+    private string $releaseName;
 
-    /** @var string */
-    private $releasePackage;
+    private string $releasePackage;
 
-    /** @var string */
-    private $releaseBuildPackage;
+    private string $releaseBuildPackage;
 
 
     protected function setup()
@@ -378,9 +376,11 @@ class Deploy extends DeployPhp\Deploy
 
     public function run()
     {
+        /** when password is get at the begin of the script (the old way)
         if (!$this->validatePrivateKey()) {
             $this->error('Bad passphrase for private key or bad private key.');
         }
+        */
 
         $this->log('=> Creating build...');
         $this->createBuild();
@@ -407,8 +407,10 @@ class Deploy extends DeployPhp\Deploy
         $this->log(' ...OK');
 
         $this->log('     -> building assets', FALSE);
-        /** @var DeployPhp\Assets $assets */
+
         $assets = require __DIR__ . '/assets.php';
+        assert($assets instanceof DeployPhp\Assets);
+
         $assets
             ->setup($releaseBuildDirectory . '/app/config/config.assets.neon', $releaseBuildDirectory . '/app/assets', $releaseBuildDirectory . '/www/assets')
             ->buildProduction();
@@ -484,6 +486,7 @@ if ($argc == 1) {
     exit(1);
 }
 
+/** when password is get at the begin of the script 
 echo 'Enter SSH key password: ';
 
 try {
@@ -495,6 +498,29 @@ try {
 }
 
 $additionalOptions = ['ssh' => ['passphrase' => $passphrase]];
+*/
+
+$additionalOptions = [
+	'ssh' => [
+		'passphrase' => function (Deploy $deploy, string $privateKeyFile): string {
+			$passphrase = NULL;
+
+			do {
+				echo $passphrase === NULL ? PHP_EOL . '          > Enter SSH key password: ' : '  > Bad password, enter again: ';
+
+				try {
+					$passphrase = Deploy::getHiddenResponse();
+					echo PHP_EOL . '        ';
+				} catch (\RuntimeException) {
+					echo '[Can\'t get hidden response, password will be visible]: ';
+					$passphrase = Deploy::getResponse();
+				}
+			} while (!$deploy->validatePrivateKey($privateKeyFile, $passphrase));
+
+			return $passphrase;
+		},
+	],
+];
 
 if ($argc > 2) {
     $additionalOptions['gitBranch'] = $argv[2];
