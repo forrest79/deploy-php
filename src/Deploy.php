@@ -241,7 +241,14 @@ class Deploy
 
 		$credentials = $this->environment['ssh'];
 
-		$key = sprintf('%s|%s@%s:%d', $class, $credentials['username'], $host, $port);
+		$keySuffix = sprintf('|%s@%s:%d', $credentials['username'], $host, $port);
+
+		if (($class === Net\SSH2::class) && isset($this->sshConnections[Net\SFTP::class . $keySuffix])) {
+			// try to load Net\SFTP cached connection that can be used as Net\SSH2
+			$key = Net\SFTP::class . $keySuffix;
+		} else {
+			$key = $class . $keySuffix;
+		}
 
 		if (!isset($this->sshConnections[$key])) {
 			$sshConnection = new $class($host, $port, 0);
