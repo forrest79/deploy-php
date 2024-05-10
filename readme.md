@@ -430,7 +430,7 @@ class Deploy extends DeployPhp\Deploy
         $this->delete($releaseBuildDirectory . '/composer.lock');
         $this->log(' ...OK');
 
-        $this->log('     -> compresing package', FALSE);
+        $this->log('     -> compressing package', FALSE);
         $this->gzip($this->releasesDirectory, $this->releaseName, $this->releaseBuildPackage);
         $this->log(' ...OK');
     }
@@ -442,32 +442,32 @@ class Deploy extends DeployPhp\Deploy
         $remoteReleaseBudilDirectory = $remoteReleaseDirectory . '/' . $this->releaseName;
         $this->log('     -> uploading build package', FALSE);
         if (!$this->sftpPut($this->releaseBuildPackage, $remoteReleaseDirectory)) {
-            $this->error(' ...an error occured while uploading build package');
+            $this->error(' ...an error occurred while uploading build package');
         }
         $this->log(' ...OK');
 
         $this->log('     -> extracting build package, creating temp, symlinks and removing build package', FALSE);
         if (!$this->ssh('cd ' . $remoteReleaseDirectory . ' && tar xfz ' . $this->releasePackage . ' && rm ' . $this->releasePackage . ' && mkdir ' . $remoteReleaseBudilDirectory . '/temp && ln -s ' . $this->environment['ssh']['directory'] . '/logs ' . $remoteReleaseBudilDirectory . '/logs && ln -s ' . $this->environment['ssh']['directory'] . '/data ' . $remoteReleaseBudilDirectory . '/www/data && ln -s ' . $this->environment['ssh']['directory'] . '/config/config.local.neon ' . $remoteReleaseBudilDirectory . '/app/config/config.local.neon')) {
-            $this->error(' ...an error occured while extracting build package, creating temp and symlinks');
+            $this->error(' ...an error occurred while extracting build package, creating temp and symlinks');
         }
         $this->log(' ...OK');
 
         $this->log('     -> releasing build (replace link to current)', FALSE);
         if (!$this->ssh('ln -sfn ' . $remoteReleaseBudilDirectory . ' ' . $this->environment['ssh']['directory'] . '/current_new && mv -Tf ' . $this->environment['ssh']['directory'] . '/current_new ' . $this->environment['ssh']['directory'] . '/current')) {
-            $this->error(' - an error occured while releasing build');
+            $this->error(' - an error occurred while releasing build');
         }
         $this->log(' ...OK');
 
         $this->log('     -> running after deploy script', FALSE);
         if (!$this->httpRequest($this->environment['deployScript'] . '?' . $this->releaseName , 'OK')) {
-            $this->error(' ...an error occured while running deploy script');
+            $this->error(' ...an error occurred while running deploy script');
         }
         $this->log(' ...OK');
 
         $keepBuilds = 5;
         $this->log('     -> cleaning up old builds', FALSE);
         if (!$this->ssh('ls ' . $remoteReleaseDirectory . '/* -1td | tail -n +' . ($keepBuilds + 1) . ' | grep -v ' . $this->releaseName . ' | xargs rm -rf')) {
-            $this->error(' ...an error occured while cleaning old build');
+            $this->error(' ...an error occurred while cleaning old build');
         }
         $this->log(' ...OK');
     }
@@ -492,7 +492,7 @@ echo 'Enter SSH key password: ';
 try {
     $passphrase = Deploy::getHiddenResponse();
     echo PHP_EOL;
-} catch (\RuntimeException $e) {
+} catch (RuntimeException $e) {
     echo '[Can\'t get hidden response, password will be visible]: ';
     $passphrase = Deploy::getResponse();
 }
@@ -502,7 +502,7 @@ $additionalOptions = ['ssh' => ['passphrase' => $passphrase]];
 
 $additionalOptions = [
 	'ssh' => [
-		'passphrase' => function (Deploy $deploy, string $privateKeyFile): string {
+		'passphrase' => static function (Deploy $deploy, string $privateKeyFile): string {
 			$passphrase = NULL;
 
 			do {
@@ -511,7 +511,7 @@ $additionalOptions = [
 				try {
 					$passphrase = Deploy::getHiddenResponse();
 					echo PHP_EOL . '        ';
-				} catch (\RuntimeException) {
+				} catch (RuntimeException) {
 					echo '[Can\'t get hidden response, password will be visible]: ';
 					$passphrase = Deploy::getResponse();
 				}
@@ -528,7 +528,7 @@ if ($argc > 2) {
 
 try {
     (new Deploy($argv[1], $additionalOptions))->run();
-} catch (\Exception $e) {
+} catch (Exception $e) {
     echo $e->getMessage() . "\n";
     exit(1);
 }
