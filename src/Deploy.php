@@ -32,6 +32,7 @@ class Deploy
 			throw new Exceptions\DeployException(sprintf('Environment \'%s\' not exists in configuration.', $environment));
 		}
 
+		/** @var array<string, EnvironmentType> $environmentConfig */
 		$environmentConfig = array_replace_recursive($this->config[$environment], $additionalConfig);
 		if ($environmentConfig === NULL) {
 			throw new Exceptions\DeployException('Can\'t prepare environment config.');
@@ -160,6 +161,7 @@ class Deploy
 
 		preg_match('/\[return_code:(.*?)\]/', $output, $match);
 		$output = preg_replace('/\[return_code:(.*?)\]/', '', $output);
+		assert(isset($match[1]));
 
 		if ($match[1] !== '0') {
 			$this->log(sprintf('SSH error output for command "%s": %s', $command, $output));
@@ -288,11 +290,11 @@ class Deploy
 					if (isset($credentials['passphrase'])) {
 						if (is_callable($credentials['passphrase'])) {
 							$passphrase = call_user_func($credentials['passphrase'], $this, $credentials['private_key']);
+							assert(is_string($passphrase));
 							$this->environment['ssh']['passphrase'] = $passphrase;
 						} else {
 							$passphrase = $credentials['passphrase'];
 						}
-						assert($passphrase === NULL || is_string($passphrase));
 					}
 
 					$privateKey = $this->createPrivateKey($credentials['private_key'], $passphrase);

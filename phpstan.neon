@@ -8,6 +8,7 @@ parameters:
 		# === PHPStan bad function definition ===
 
 		-
-			message: '#Strict comparison using === between array and null will always evaluate to false\.#'
-			path: %rootDir%/../../../src/Deploy.php
+			message: '#^Strict comparison using \=\=\= between array\<string, array\{server\: string, port\: int, username\: string, private_key\?\: string, passphrase\?\: \(callable\(static, string\)\: \(string\|null\)\)\|string\|null, ssh_agent\?\: bool\|string\}\> and null will always evaluate to false\.$#'
+			identifier: identical.alwaysFalse
 			count: 1
+			path: src/Deploy.php
