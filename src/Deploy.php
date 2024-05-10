@@ -160,6 +160,7 @@ class Deploy
 
 		preg_match('/\[return_code:(.*?)\]/', $output, $match);
 		$output = preg_replace('/\[return_code:(.*?)\]/', '', $output);
+		assert(isset($match[1]));
 
 		if ($match[1] !== '0') {
 			$this->log(sprintf('SSH error output for command "%s": %s', $command, $output));
