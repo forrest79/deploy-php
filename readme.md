@@ -540,9 +540,11 @@ IF you're using monorepo for you applications, you need simple tool to prepare c
 - one shared global vendor directory with all libraries
 - more applications with local vendors that on local development using the shared one and are installed on production
 
-> Be careful, using this tool is always performed update on the global composer! The next step is copy global composer to the local one and update is also performed here. After this is local vendor cleaned.
+> Be careful, using this tool update is always performed on the global composer! The next step is copy global composer to the local one and update is also performed here. After this is local vendor cleaned.
 
 > Just for hint, differences between global and locals composer.json are shown. This may not be a mistake.
+
+> This tool can handle global composer in neon format - you need [Nette\Neon](https://github.com/nette/neon) in your vendor and [Composer neon plugin](https://github.com/forrest79/composer-yaml-neon-plugin) 
 
 #### Example:
 

@@ -2,6 +2,8 @@
 
 namespace Forrest79\DeployPhp;
 
+use Nette\Neon;
+
 class ComposerMonorepo
 {
 	private const COLOR_GREEN = "\e[32m";
@@ -9,28 +11,41 @@ class ComposerMonorepo
 	private const COLOR_RED = "\e[31m";
 	private const COLOR_RESET = "\e[0m";
 
-	private string $globalComposerJsonFile;
+	private string $globalComposerFile;
 
 	private string|NULL $gitUpdateParameters;
 
 	/** @var array{require: array<string, string>} */
-	private array $globalComposerJson;
+	private array $globalComposerData;
 
 
-	public function __construct(string $globalComposerJsonFile, string|NULL $gitUpdateParameters = NULL)
+	public function __construct(string $globalComposerFile, string|NULL $gitUpdateParameters = NULL)
 	{
-		$globalComposer = @file_get_contents($globalComposerJsonFile);
+		$globalComposer = @file_get_contents($globalComposerFile);
 		if ($globalComposer === FALSE) {
-			echo self::COLOR_RED . 'No global composer.json' . self::COLOR_RESET . PHP_EOL;
+			echo self::COLOR_RED . 'Global composer definition not exists: ' . $globalComposerFile . self::COLOR_RESET . PHP_EOL;
 			exit(1);
 		}
 
-		$this->globalComposerJsonFile = $globalComposerJsonFile;
+		$composerExt = strtolower(pathinfo($globalComposerFile, PATHINFO_EXTENSION));
+
+		$this->globalComposerFile = $globalComposerFile;
 		$this->gitUpdateParameters = $gitUpdateParameters;
 
-		/** @var array{require: array<string, string>} $globalComposerJson */
-		$globalComposerJson = json_decode($globalComposer, TRUE); // assign to variable is because of phpstan
-		$this->globalComposerJson = $globalComposerJson;
+		if ($composerExt === 'neon') {
+			if (!class_exists(Neon\Neon::class)) {
+				echo self::COLOR_RED . 'You need nette\neon library to load composer in neon format' . self::COLOR_RESET . PHP_EOL;
+				exit(1);
+			}
+
+			/** @var array{require: array<string, string>} $globalComposerData */
+			$globalComposerData = Neon\Neon::decode($globalComposer);
+		} else {
+			/** @var array{require: array<string, string>} $globalComposerData */
+			$globalComposerData = json_decode($globalComposer, TRUE);
+		}
+
+		$this->globalComposerData = $globalComposerData;
 	}
 
 
@@ -64,12 +79,12 @@ class ComposerMonorepo
 		/** @var array{require: array<string, string>} $localComposer */
 		$localComposer = json_decode($localComposerData, TRUE);
 
-		self::composerDiff($localComposerFile, 'Local', array_diff_assoc($this->globalComposerJson['require'], $localComposer['require']), FALSE);
-		self::composerDiff($localComposerFile, 'Global', array_diff_assoc($localComposer['require'], $this->globalComposerJson['require']), TRUE);
+		self::composerDiff($localComposerFile, 'Local', array_diff_assoc($this->globalComposerData['require'], $localComposer['require']), FALSE);
+		self::composerDiff($localComposerFile, 'Global', array_diff_assoc($localComposer['require'], $this->globalComposerData['require']), TRUE);
 
 		$updateCommand = 'composer --working-dir=%s update' . ($this->gitUpdateParameters === NULL ? '' : (' ' . $this->gitUpdateParameters));
 
-		$globalDir = realpath(dirname($this->globalComposerJsonFile));
+		$globalDir = realpath(dirname($this->globalComposerFile));
 
 		// Update global vendor
 		self::exec(sprintf($updateCommand, $globalDir));
@@ -99,7 +114,7 @@ class ComposerMonorepo
 					? (self::COLOR_RED . 'Synchronize local (%s) and global (%s) composer.json first.')
 					: (self::COLOR_YELLOW . 'There are some differences between local (%s) and global (%s) composer.json - this is just info message.'),
 				realpath($localComposerFile),
-				realpath($this->globalComposerJsonFile),
+				realpath($this->globalComposerFile),
 			) . self::COLOR_RESET . PHP_EOL . $type . ' composer.json has these differences:' . PHP_EOL;
 
 			foreach ($packages as $package => $version) {
