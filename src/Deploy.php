@@ -306,7 +306,7 @@ class Deploy
 	 *
 	 * @param class-string<Net\SSH2> $class
 	 */
-	private static function createSshConnection(string $class, string|NULL $host, int|NULL $port): Net\SSH2
+	private static function createSshConnection(string $class, string $host, int $port): Net\SSH2
 	{
 		return new $class($host, $port, 0);
 	}
