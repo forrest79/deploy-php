@@ -12,16 +12,16 @@ use RecursiveIteratorIterator;
  */
 class Assets
 {
-	public const DEBUG = 'debug';
-	public const PRODUCTION = 'production';
+	public const string DEBUG = 'debug';
+	public const string PRODUCTION = 'production';
 
-	public const COPY = 'copy';
-	public const LESS = 'less';
-	public const SASS = 'sass';
-	public const UGLIFYJS = 'uglifyjs';
-	public const ROLLUP = 'rollup';
+	public const string COPY = 'copy';
+	public const string LESS = 'less';
+	public const string SASS = 'sass';
+	public const string UGLIFYJS = 'uglifyjs';
+	public const string ROLLUP = 'rollup';
 
-	private const DEFAULT_SYSTEM_BIN_PATH = '/usr/bin:/bin';
+	private const string DEFAULT_SYSTEM_BIN_PATH = '/usr/bin:/bin';
 
 	/** @phpstan-var AssetsConfig */
 	private array $config;

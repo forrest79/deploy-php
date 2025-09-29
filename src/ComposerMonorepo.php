@@ -6,10 +6,10 @@ use Nette\Neon;
 
 class ComposerMonorepo
 {
-	private const COLOR_GREEN = "\e[32m";
-	private const COLOR_YELLOW = "\e[33m";
-	private const COLOR_RED = "\e[31m";
-	private const COLOR_RESET = "\e[0m";
+	private const string COLOR_GREEN = "\e[32m";
+	private const string COLOR_YELLOW = "\e[33m";
+	private const string COLOR_RED = "\e[31m";
+	private const string COLOR_RESET = "\e[0m";
 
 	private string $globalComposerFile;
 
