@@ -28,7 +28,7 @@ composer require --dev forrest79/deploy-php
 
 This is a simple assets builder. Currently, it supports copying files, compiling and minifying [less](http://lesscss.org/) files, [sass](https://sass-lang.com/) files and JavaScript (simple minifier [UglifyJS](https://github.com/mishoo/UglifyJS) or complex [rollup.js](https://rollupjs.org/) + recommended [Babel](https://babeljs.io/)) files and in debug environment also generating map files.
 
-For compiling and minifying is required `node.js` with installed `npm` packages `less`, `node-sass`, `uglify-js` or `rollup` (`babel`) environment. In Debian or Ubuntu, you can do it like this (`-g` option install package globally in the system, not in your repository):
+For compiling and minifying is required `node.js` with installed `npm` packages `less`, `sass`, `uglify-js` or `rollup` (`babel`) environment. In Debian or Ubuntu, you can do it like this (`-g` option install package globally in the system, not in your repository):
 
 ```bash
 curl -sL https://deb.nodesource.com/setup_15.x | sudo -E bash -
@@ -39,8 +39,8 @@ npm install less
 #sudo npm install -g less
 
 # SASS compiler
-npm install node-sass
-#sudo npm install -g node-sass
+npm install sass
+#sudo npm install -g sass
 
 # UglifyJS compiler
 npm install uglify-js

@@ -177,7 +177,7 @@ class Assets
 					}
 					foreach ($data['files'] ?? [$data['file']] as $file) {
 						assert($file !== null);
-						$this->compilesSass($file, $path, $isDebug);
+						$this->compilesSass($file, $path . DIRECTORY_SEPARATOR . pathinfo($file, PATHINFO_FILENAME) . '.css', $isDebug);
 					}
 					break;
 
@@ -202,7 +202,7 @@ class Assets
 	private function compilesLess(string $sourceFile, string $destinationFile, bool $createMap): void
 	{
 		$mapCommand = '';
-		if ($createMap === true) {
+		if ($createMap) {
 			$sourceMapDirectory = dirname($this->localSourceDirectory !== null ? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $sourceFile) : $sourceFile);
 			$mapCommand = sprintf('--source-map --source-map-rootpath=file:///%s ', $sourceMapDirectory);
 		}
@@ -217,19 +217,14 @@ class Assets
 	}
 
 
-	private function compilesSass(string $sourceFile, string $destinationDirectory, bool $createMap): void
+	private function compilesSass(string $sourceFile, string $destinationFile, bool $createMap): void
 	{
-		$mapCommand = '';
-		if ($createMap === true) {
-			$mapCommand = ' --source-map true --source-map-contents true';
-		}
-
 		$this->exec(sprintf(
-			'%s %s --quiet --output-style=compressed --output="%s"%s',
-			$this->npxCommand('node-sass'),
+			'%s --quiet --style=compressed %s %s %s',
+			$this->npxCommand('sass'),
+			$createMap ? '--embed-source-map' : '--no-source-map',
 			$sourceFile,
-			$this->prepareDestinationPath($destinationDirectory),
-			$mapCommand,
+			$this->prepareDestinationPath($destinationFile),
 		), 'css-sass');
 	}
 
@@ -243,7 +238,7 @@ class Assets
 
 		$mapSources = [];
 
-		if ($createMap === true) {
+		if ($createMap) {
 			foreach ($sourceFiles as $sourceFile) {
 				$sourcePath = $this->sourceDirectory . DIRECTORY_SEPARATOR . $sourceFile;
 				$mapSources[$sourcePath] = 'file:///' . ($this->localSourceDirectory !== null
@@ -253,7 +248,7 @@ class Assets
 		}
 
 		$mapCommand = '';
-		if ($createMap === true) {
+		if ($createMap) {
 			$mapCommand = sprintf('--source-map url=%s.map ', basename($destinationFile));
 		}
 
@@ -265,7 +260,7 @@ class Assets
 			$mapCommand,
 		), 'js-uglifyjs');
 
-		if ($createMap === true) {
+		if ($createMap) {
 			$mapFile = $destinationFile . '.map';
 			$mapContents = file_get_contents($mapFile);
 			if ($mapContents === false) {
