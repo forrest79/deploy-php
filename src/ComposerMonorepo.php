@@ -13,16 +13,16 @@ class ComposerMonorepo
 
 	private string $globalComposerFile;
 
-	private string|NULL $gitUpdateParameters;
+	private string|null $gitUpdateParameters;
 
 	/** @var array{require: array<string, string>} */
 	private array $globalComposerData;
 
 
-	public function __construct(string $globalComposerFile, string|NULL $gitUpdateParameters = NULL)
+	public function __construct(string $globalComposerFile, string|null $gitUpdateParameters = null)
 	{
 		$globalComposer = @file_get_contents($globalComposerFile);
-		if ($globalComposer === FALSE) {
+		if ($globalComposer === false) {
 			echo self::COLOR_RED . 'Global composer definition not exists: ' . $globalComposerFile . self::COLOR_RESET . PHP_EOL;
 			exit(1);
 		}
@@ -42,7 +42,7 @@ class ComposerMonorepo
 			$globalComposerData = Neon\Neon::decode($globalComposer);
 		} else {
 			/** @var array{require: array<string, string>} $globalComposerData */
-			$globalComposerData = json_decode($globalComposer, TRUE);
+			$globalComposerData = json_decode($globalComposer, true);
 		}
 
 		$this->globalComposerData = $globalComposerData;
@@ -63,13 +63,13 @@ class ComposerMonorepo
 	private function synchronizeApp(string $appName, string $localComposerFile): void
 	{
 		$localComposerData = @file_get_contents($localComposerFile);
-		if ($localComposerData === FALSE) {
+		if ($localComposerData === false) {
 			echo self::COLOR_RED . sprintf('No local composer.json (%s).', $localComposerFile) . self::COLOR_RESET . PHP_EOL;
 			exit(1);
 		}
 
 		$appDir = realpath(dirname($localComposerFile));
-		if ($appDir === FALSE) {
+		if ($appDir === false) {
 			echo self::COLOR_RED . sprintf('App directory \'%s\' not exists.', dirname($localComposerFile)) . self::COLOR_RESET . PHP_EOL;
 			exit(1);
 		}
@@ -77,14 +77,15 @@ class ComposerMonorepo
 		echo self::COLOR_GREEN . strtoupper($appName) . ':' . self::COLOR_RESET . PHP_EOL . PHP_EOL;
 
 		/** @var array{require: array<string, string>} $localComposer */
-		$localComposer = json_decode($localComposerData, TRUE);
+		$localComposer = json_decode($localComposerData, true);
 
-		self::composerDiff($localComposerFile, 'Local', array_diff_assoc($this->globalComposerData['require'], $localComposer['require']), FALSE);
-		self::composerDiff($localComposerFile, 'Global', array_diff_assoc($localComposer['require'], $this->globalComposerData['require']), TRUE);
+		self::composerDiff($localComposerFile, 'Local', array_diff_assoc($this->globalComposerData['require'], $localComposer['require']), false);
+		self::composerDiff($localComposerFile, 'Global', array_diff_assoc($localComposer['require'], $this->globalComposerData['require']), true);
 
-		$updateCommand = 'composer --working-dir=%s update' . ($this->gitUpdateParameters === NULL ? '' : (' ' . $this->gitUpdateParameters));
+		$updateCommand = 'composer --working-dir=%s update' . ($this->gitUpdateParameters === null ? '' : (' ' . $this->gitUpdateParameters));
 
 		$globalDir = realpath(dirname($this->globalComposerFile));
+		assert($globalDir !== false);
 
 		// Update global vendor
 		self::exec(sprintf($updateCommand, $globalDir));

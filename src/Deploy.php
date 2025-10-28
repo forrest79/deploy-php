@@ -9,11 +9,11 @@ use phpseclib3\Net;
 use phpseclib3\System;
 
 /**
- * @phpstan-type EnvironmentType array{server: string, port: int, username: string, private_key?: string, passphrase?: string|callable(static, string): (string|NULL)|NULL, ssh_agent?: string|bool}
+ * @phpstan-type EnvironmentType array{server: string, port: int, username: string, private_key?: string, passphrase?: string|callable(static, string): (string|null)|null, ssh_agent?: string|bool}
  */
 class Deploy
 {
-	/** @var array<string, array<string, bool|float|int|string|array<mixed>|NULL>> */
+	/** @var array<string, array<string, bool|float|int|string|array<mixed>|null>> */
 	protected array $config = [];
 
 	/** @var array<string, EnvironmentType> */
@@ -34,7 +34,7 @@ class Deploy
 
 		/** @var array<string, EnvironmentType> $environmentConfig */
 		$environmentConfig = array_replace_recursive($this->config[$environment], $additionalConfig);
-		if ($environmentConfig === NULL) {
+		if ($environmentConfig === null) {
 			throw new Exceptions\DeployException('Can\'t prepare environment config.');
 		}
 
@@ -78,12 +78,12 @@ class Deploy
 		$zipFile = $checkoutDirectory . DIRECTORY_SEPARATOR . uniqid() . '-git.zip';
 
 		$currentDirectory = getcwd();
-		if ($currentDirectory === FALSE) {
+		if ($currentDirectory === false) {
 			throw new Exceptions\DeployException('Can\'t determine current directory');
 		}
 
 		$gitRootDirectoryPath = realpath($gitRootDirectory);
-		if ($gitRootDirectoryPath === FALSE) {
+		if ($gitRootDirectoryPath === false) {
 			throw new Exceptions\DeployException(sprintf('GIT root directory \'%s\' doesn\'t exists', $gitRootDirectory));
 		}
 
@@ -99,10 +99,10 @@ class Deploy
 	}
 
 
-	protected function exec(string $command, string|FALSE &$stdout = FALSE): bool
+	protected function exec(string $command, string|false &$stdout = false): bool
 	{
 		exec($command, $output, $return);
-		if (($output !== []) && ($stdout !== FALSE)) {
+		if (($output !== []) && ($stdout !== false)) {
 			$stdout = implode(PHP_EOL, $output);
 		}
 		return $return === 0;
@@ -118,15 +118,15 @@ class Deploy
 	}
 
 
-	public function validatePrivateKey(string|NULL $privateKeyFile = NULL, string|NULL $passphrase = NULL): bool
+	public function validatePrivateKey(string|null $privateKeyFile = null, string|null $passphrase = null): bool
 	{
-		if (($privateKeyFile === NULL) && ($passphrase !== NULL)) {
+		if (($privateKeyFile === null) && ($passphrase !== null)) {
 			throw new Exceptions\DeployException('Can\'t provide passphrase without private key file');
 		}
 
 		$credentials = $this->environment['ssh'];
 
-		if ($privateKeyFile === NULL) {
+		if ($privateKeyFile === null) {
 			if (isset($credentials['private_key'])) {
 				$privateKeyFile = $credentials['private_key'];
 			} else {
@@ -134,7 +134,7 @@ class Deploy
 			}
 		}
 
-		$passphrase ??= $credentials['passphrase'] ?? NULL;
+		$passphrase ??= $credentials['passphrase'] ?? null;
 		if (is_callable($passphrase)) {
 			throw new Exceptions\DeployException('Private key can\'t be validated with callable passphrase');
 		}
@@ -142,19 +142,19 @@ class Deploy
 		try {
 			$this->createPrivateKey($privateKeyFile, $passphrase);
 		} catch (Exception\NoKeyLoadedException) {
-			return FALSE;
+			return false;
 		}
 
-		return TRUE;
+		return true;
 	}
 
 
 	protected function ssh(
 		string $command,
-		string|NULL $validate = NULL,
-		string|NULL &$output = NULL,
-		string|NULL $host = NULL,
-		int|NULL $port = NULL,
+		string|null $validate = null,
+		string|null &$output = null,
+		string|null $host = null,
+		int|null $port = null,
 	): bool
 	{
 		$output = $this->sshExec($this->sshConnection(Net\SSH2::class, $host, $port), $command . ';echo "[return_code:$?]"');
@@ -164,27 +164,27 @@ class Deploy
 		assert(isset($match[1]));
 
 		if ($match[1] !== '0') {
-			$this->log(sprintf('SSH error output for command "%s": %s', $command, $output));
-			return FALSE;
+			$this->log(sprintf('SSH error output for command "%s": %s', $command, $output ?? ''));
+			return false;
 		}
 
-		if ($validate !== NULL) {
+		if ($validate !== null) {
 			$success = str_contains($output ?? '', $validate);
 			if (!$success) {
-				$this->log(sprintf('SSH validation error: "%s" doesn\'t contains "%s"', $output, $validate));
+				$this->log(sprintf('SSH validation error: "%s" doesn\'t contains "%s"', $output ?? '', $validate));
 			}
 			return $success;
 		}
 
-		return TRUE;
+		return true;
 	}
 
 
 	protected function sftpPut(
 		string $localFile,
 		string $remoteDirectory,
-		string|NULL $host = NULL,
-		int|NULL $port = NULL,
+		string|null $host = null,
+		int|null $port = null,
 	): bool
 	{
 		$remoteDirectory = rtrim($remoteDirectory, '/');
@@ -200,24 +200,24 @@ class Deploy
 	}
 
 
-	protected function httpRequest(string $url, string|NULL $validate = NULL): bool
+	protected function httpRequest(string $url, string|null $validate = null): bool
 	{
 		$curl = curl_init($url);
-		if ($curl === FALSE) {
+		if ($curl === false) {
 			throw new Exceptions\DeployException('Can\'t initialize curl');
 		}
 
-		curl_setopt($curl, CURLOPT_HEADER, FALSE);
-		curl_setopt($curl, CURLOPT_RETURNTRANSFER, $validate !== NULL);
+		curl_setopt($curl, CURLOPT_HEADER, false);
+		curl_setopt($curl, CURLOPT_RETURNTRANSFER, $validate !== null);
 
 		$returned = curl_exec($curl);
 
 		$errorNo = curl_errno($curl);
 		curl_close($curl);
 
-		if ($validate !== NULL) {
+		if ($validate !== null) {
 			if (!is_string($returned)) {
-				return FALSE;
+				return false;
 			}
 			return str_contains($returned, $validate);
 		}
@@ -226,13 +226,13 @@ class Deploy
 	}
 
 
-	protected function error(string|NULL $message = NULL): void
+	protected function error(string|null $message = null): void
 	{
 		throw new Exceptions\DeployException($message ?? '');
 	}
 
 
-	protected function log(string $message, bool $newLine = TRUE): void
+	protected function log(string $message, bool $newLine = true): void
 	{
 		echo $message . ($newLine ? PHP_EOL : '');
 	}
@@ -241,12 +241,12 @@ class Deploy
 	/**
 	 * @param class-string<Net\SSH2> $class
 	 */
-	private function sshConnection(string $class, string|NULL $host, int|NULL $port): Net\SSH2
+	private function sshConnection(string $class, string|null $host, int|null $port): Net\SSH2
 	{
-		if ($host === NULL) {
+		if ($host === null) {
 			$host = $this->environment['ssh']['server'];
 		}
-		if ($port === NULL) {
+		if ($port === null) {
 			$port = $this->environment['ssh']['port'] ?? 22;
 		}
 
@@ -264,16 +264,16 @@ class Deploy
 		if (!isset($this->sshConnections[$key])) {
 			$sshConnection = self::createSshConnection($class, $host, $port);
 
-			$isConnectedByAgent = FALSE;
-			$sshAgent = NULL;
+			$isConnectedByAgent = false;
+			$sshAgent = null;
 			if (isset($credentials['ssh_agent']) && (bool) $credentials['ssh_agent']) {
-				$sshAgent = new System\SSH\Agent($credentials['ssh_agent'] === TRUE ? NULL : $credentials['ssh_agent']);
+				$sshAgent = new System\SSH\Agent($credentials['ssh_agent'] === true ? null : $credentials['ssh_agent']);
 				$isConnectedByAgent = $sshConnection->login($credentials['username'], $sshAgent);
 			}
 
 			if (!$isConnectedByAgent) {
 				if (isset($credentials['private_key'])) {
-					$passphrase = NULL;
+					$passphrase = null;
 					if (isset($credentials['passphrase'])) {
 						if (is_callable($credentials['passphrase'])) {
 							$passphrase = call_user_func($credentials['passphrase'], $this, $credentials['private_key']);
@@ -287,7 +287,7 @@ class Deploy
 					$privateKey = $this->createPrivateKey($credentials['private_key'], $passphrase);
 					$sshConnection = new $class($host, $port, 0);
 					if (!$sshConnection->login($credentials['username'], $privateKey)) {
-						throw new Exceptions\DeployException(sprintf('SSH can\'t authenticate with private key \'%s\'%s', $credentials['private_key'], $sshAgent === NULL ? '' : ' (ssh-agent was also tried)'));
+						throw new Exceptions\DeployException(sprintf('SSH can\'t authenticate with private key \'%s\'%s', $credentials['private_key'], $sshAgent === null ? '' : ' (ssh-agent was also tried)'));
 					}
 				} else {
 					throw new Exceptions\DeployException('Unsupported authentication type for SSH.');
@@ -315,7 +315,7 @@ class Deploy
 	private function sshExec(Net\SSH2 $sshConnection, string $command): string
 	{
 		$result = $sshConnection->exec($command);
-		if ($result === FALSE) {
+		if ($result === false) {
 			throw new Exceptions\DeployException(sprintf('SSH command \'%s\' failed', $command));
 		}
 
@@ -324,15 +324,15 @@ class Deploy
 	}
 
 
-	private function createPrivateKey(string $privateKeyFile, string|NULL $passphrase): Crypt\RSA\PrivateKey
+	private function createPrivateKey(string $privateKeyFile, string|null $passphrase): Crypt\RSA\PrivateKey
 	{
 		$privateKeyContents = file_get_contents($privateKeyFile);
-		if ($privateKeyContents === FALSE) {
+		if ($privateKeyContents === false) {
 			throw new Exceptions\DeployException(sprintf('SSH can\'t load private key \'%s\'', $privateKeyFile));
 		}
 
-		// this if is for PHPStan, we can do also `Crypt\RSA::load($privateKeyContents, $passphrase ?? FALSE)` and ignore PHPStan error
-		$privateKey = $passphrase === NULL
+		// this if is for PHPStan, we can do also `Crypt\RSA::load($privateKeyContents, $passphrase ?? false)` and ignore PHPStan error
+		$privateKey = $passphrase === null
 			? Crypt\RSA::load($privateKeyContents)
 			: Crypt\RSA::load($privateKeyContents, $passphrase);
 		assert($privateKey instanceof Crypt\RSA\PrivateKey);
@@ -344,7 +344,7 @@ class Deploy
 	public static function getResponse(): string
 	{
 		$response = stream_get_line(STDIN, 1024, PHP_EOL);
-		if ($response === FALSE) {
+		if ($response === false) {
 			throw new Exceptions\DeployException('Can\'t get response');
 		}
 		return $response;
@@ -366,12 +366,13 @@ class Deploy
 
 		if (self::hasSttyAvailable()) {
 			$sttyMode = exec('stty -g');
+			assert($sttyMode !== false);
 
 			exec('stty -echo');
 			$value = fgets(STDIN, 4096);
 			exec(sprintf('stty %s', $sttyMode));
 
-			if ($value === FALSE) {
+			if ($value === false) {
 				throw new Exceptions\DeployException('Hidden response aborted.');
 			}
 
@@ -379,7 +380,7 @@ class Deploy
 		}
 
 		$shell = self::getShell();
-		if ($shell !== NULL) {
+		if ($shell !== null) {
 			$readCmd = ($shell === 'csh') ? 'set mypassword = $<' : 'read -r mypassword';
 			$command = sprintf("/usr/bin/env %s -c 'stty -echo; %s; stty echo; echo \$mypassword'", $shell, $readCmd);
 			exec($command, $output, $resultCode);
@@ -393,9 +394,9 @@ class Deploy
 	}
 
 
-	private static function getShell(): string|NULL
+	private static function getShell(): string|null
 	{
-		$shell = NULL;
+		$shell = null;
 
 		if (file_exists('/usr/bin/env')) {
 			// handle other OSs with bash/zsh/ksh/csh if available to hide the answer

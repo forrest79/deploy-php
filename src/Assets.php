@@ -8,7 +8,7 @@ use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 
 /**
- * @phpstan-type AssetsConfig array<string, array{type: string|NULL, file?: string|NULL, files?: array<string>, env?: string}|string>
+ * @phpstan-type AssetsConfig array<string, array{type: string|null, file?: string|null, files?: array<string>, env?: string}|string>
  */
 class Assets
 {
@@ -38,7 +38,7 @@ class Assets
 
 	private string $systemBinPath = self::DEFAULT_SYSTEM_BIN_PATH;
 
-	private string|NULL $localSourceDirectory = NULL;
+	private string|null $localSourceDirectory = null;
 
 	private string $configFile;
 
@@ -176,7 +176,7 @@ class Assets
 						throw new \InvalidArgumentException(sprintf('No file or files defined for \'%s\'.', $path));
 					}
 					foreach ($data['files'] ?? [$data['file']] as $file) {
-						assert($file !== NULL);
+						assert($file !== null);
 						$this->compilesSass($file, $path, $isDebug);
 					}
 					break;
@@ -202,8 +202,8 @@ class Assets
 	private function compilesLess(string $sourceFile, string $destinationFile, bool $createMap): void
 	{
 		$mapCommand = '';
-		if ($createMap === TRUE) {
-			$sourceMapDirectory = dirname($this->localSourceDirectory !== NULL ? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $sourceFile) : $sourceFile);
+		if ($createMap === true) {
+			$sourceMapDirectory = dirname($this->localSourceDirectory !== null ? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $sourceFile) : $sourceFile);
 			$mapCommand = sprintf('--source-map --source-map-rootpath=file:///%s ', $sourceMapDirectory);
 		}
 
@@ -220,7 +220,7 @@ class Assets
 	private function compilesSass(string $sourceFile, string $destinationDirectory, bool $createMap): void
 	{
 		$mapCommand = '';
-		if ($createMap === TRUE) {
+		if ($createMap === true) {
 			$mapCommand = ' --source-map true --source-map-contents true';
 		}
 
@@ -243,17 +243,17 @@ class Assets
 
 		$mapSources = [];
 
-		if ($createMap === TRUE) {
+		if ($createMap === true) {
 			foreach ($sourceFiles as $sourceFile) {
 				$sourcePath = $this->sourceDirectory . DIRECTORY_SEPARATOR . $sourceFile;
-				$mapSources[$sourcePath] = 'file:///' . ($this->localSourceDirectory !== NULL
+				$mapSources[$sourcePath] = 'file:///' . ($this->localSourceDirectory !== null
 					? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $sourceFile)
 					: realpath($sourcePath));
 			}
 		}
 
 		$mapCommand = '';
-		if ($createMap === TRUE) {
+		if ($createMap === true) {
 			$mapCommand = sprintf('--source-map url=%s.map ', basename($destinationFile));
 		}
 
@@ -265,10 +265,10 @@ class Assets
 			$mapCommand,
 		), 'js-uglifyjs');
 
-		if ($createMap === TRUE) {
+		if ($createMap === true) {
 			$mapFile = $destinationFile . '.map';
 			$mapContents = file_get_contents($mapFile);
-			if ($mapContents === FALSE) {
+			if ($mapContents === false) {
 				throw new Exceptions\AssetsException(sprintf('Map file \'%s\' doesn\'t exists', $mapFile));
 			}
 			file_put_contents($mapFile, strtr($mapContents, $mapSources));
@@ -319,7 +319,7 @@ class Assets
 	private function lock(): string
 	{
 		$handle = @fopen($this->lockFile, 'c+'); // intentionally @
-		if ($handle === FALSE) {
+		if ($handle === false) {
 			throw new Exceptions\AssetsException(sprintf('Unable to create file \'%s\' %s', $this->lockFile, error_get_last()['message'] ?? 'unknown'));
 		} elseif (!@flock($handle, LOCK_EX)) { // intentionally @
 			throw new Exceptions\AssetsException(sprintf('Unable to acquire exclusive lock on \'%s\' %s', $this->lockFile, error_get_last()['message'] ?? 'unknown'));
@@ -327,7 +327,7 @@ class Assets
 		$this->lockHandle = $handle;
 
 		$lockPath = realpath($this->lockFile);
-		if ($lockPath === FALSE) {
+		if ($lockPath === false) {
 			throw new Exceptions\AssetsException('Lock file not exists');
 		}
 

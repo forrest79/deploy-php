@@ -180,12 +180,12 @@ return (new DeployPhp\Assets(
     ],
     static function (string $configFile): ?string {
         if (!file_exists($configFile)) {
-            return NULL;
+            return null;
         }
 
         $data = Neon\Neon::decode(file_get_contents($configFile));
         if (!isset($data['assets']['hash'])) {
-            return NULL;
+            return null;
         }
 
         return $data['assets']['hash'];
@@ -193,7 +193,7 @@ return (new DeployPhp\Assets(
     static function (string $configFile, string $hash): void {
         file_put_contents($configFile, "assets:\n\t\thash: $hash\n");
     },
-    ((($localConfig = @include __DIR__ . '/assets.local.php') === FALSE) ? [] : $localConfig)
+    ((($localConfig = @include __DIR__ . '/assets.local.php') === false) ? [] : $localConfig)
 );
 ```
 
@@ -231,7 +231,7 @@ if (PHP_SAPI !== 'cli') {
     $configurator->addConfig($assetsConfigFile);
     if ($configurator->isDebugMode()) {
         $assets = @include __DIR__ . '/../assets/assets.php'; // intentionally @ - file may not exists - good when production with production assets is running in debug mode (production preferable doesn't have assets source)
-        if ($assets !== FALSE) {
+        if ($assets !== false) {
             $assets->buildDebug($assetsConfigFile, __DIR__ . '/../../www/assets');
         }
     }
@@ -281,7 +281,7 @@ use Nette\DI\CompilerExtension;
 class Extension extends CompilerExtension
 {
     private $defaults = [
-        'hash' => NULL,
+        'hash' => null,
     ];
 
 
@@ -337,7 +337,7 @@ require __DIR__ . '/deploy.local.php';
 
 class Deploy extends DeployPhp\Deploy
 {
-    /** @var array<string, array<string, bool|float|int|string|array<mixed>|NULL>> */
+    /** @var array<string, array<string, bool|float|int|string|array<mixed>|null>> */
     protected array $config = [
         'vps' => [
             'gitBranch' => 'master',
@@ -346,8 +346,8 @@ class Deploy extends DeployPhp\Deploy
                 'directory' => '/var/www/site.com',
                 'username' => 'forrest79',
                 'private_key' => 'C:\\Certificates\\certificate',
-                'passphrase' => NULL, // is completed dynamically - if needed (agent is tried at first), can be also callback call when password is needed
-				'ssh_agent' => SSH_AGENT_SOCK, // TRUE - try to read from env variable, string - socket file
+                'passphrase' => null, // is completed dynamically - if needed (agent is tried at first), can be also callback call when password is needed
+				'ssh_agent' => SSH_AGENT_SOCK, // true - try to read from env variable, string - socket file
             ],
             'deployScript' => 'https://www.site.com/deploy.php',
         ]
@@ -400,13 +400,13 @@ class Deploy extends DeployPhp\Deploy
     {
         $releaseBuildDirectory = $this->releasesDirectory . DIRECTORY_SEPARATOR . $this->releaseName;
 
-        $this->log('     -> checkout from GIT', FALSE);
+        $this->log('     -> checkout from GIT', false);
         if (!$this->gitCheckout(__DIR__ . DIRECTORY_SEPARATOR . '..', $releaseBuildDirectory, $this->environment['gitBranch'])) {
             $this->error(' ...cant\'t checkout from GIT');
         }
         $this->log(' ...OK');
 
-        $this->log('     -> building assets', FALSE);
+        $this->log('     -> building assets', false);
 
         $assets = require __DIR__ . '/assets.php';
         assert($assets instanceof DeployPhp\Assets);
@@ -416,7 +416,7 @@ class Deploy extends DeployPhp\Deploy
             ->buildProduction();
         $this->log(' ...OK');
 
-        $this->log('     -> preparing package', FALSE);
+        $this->log('     -> preparing package', false);
         $this->delete($releaseBuildDirectory . '/app/assets');
         $this->delete($releaseBuildDirectory . '/conf');
         $this->delete($releaseBuildDirectory . '/data');
@@ -430,7 +430,7 @@ class Deploy extends DeployPhp\Deploy
         $this->delete($releaseBuildDirectory . '/composer.lock');
         $this->log(' ...OK');
 
-        $this->log('     -> compressing package', FALSE);
+        $this->log('     -> compressing package', false);
         $this->gzip($this->releasesDirectory, $this->releaseName, $this->releaseBuildPackage);
         $this->log(' ...OK');
     }
@@ -440,32 +440,32 @@ class Deploy extends DeployPhp\Deploy
     {
         $remoteReleaseDirectory = $this->environment['ssh']['directory'] . '/releases';
         $remoteReleaseBudilDirectory = $remoteReleaseDirectory . '/' . $this->releaseName;
-        $this->log('     -> uploading build package', FALSE);
+        $this->log('     -> uploading build package', false);
         if (!$this->sftpPut($this->releaseBuildPackage, $remoteReleaseDirectory)) {
             $this->error(' ...an error occurred while uploading build package');
         }
         $this->log(' ...OK');
 
-        $this->log('     -> extracting build package, creating temp, symlinks and removing build package', FALSE);
+        $this->log('     -> extracting build package, creating temp, symlinks and removing build package', false);
         if (!$this->ssh('cd ' . $remoteReleaseDirectory . ' && tar xfz ' . $this->releasePackage . ' && rm ' . $this->releasePackage . ' && mkdir ' . $remoteReleaseBudilDirectory . '/temp && ln -s ' . $this->environment['ssh']['directory'] . '/logs ' . $remoteReleaseBudilDirectory . '/logs && ln -s ' . $this->environment['ssh']['directory'] . '/data ' . $remoteReleaseBudilDirectory . '/www/data && ln -s ' . $this->environment['ssh']['directory'] . '/config/config.local.neon ' . $remoteReleaseBudilDirectory . '/app/config/config.local.neon')) {
             $this->error(' ...an error occurred while extracting build package, creating temp and symlinks');
         }
         $this->log(' ...OK');
 
-        $this->log('     -> releasing build (replace link to current)', FALSE);
+        $this->log('     -> releasing build (replace link to current)', false);
         if (!$this->ssh('ln -sfn ' . $remoteReleaseBudilDirectory . ' ' . $this->environment['ssh']['directory'] . '/current_new && mv -Tf ' . $this->environment['ssh']['directory'] . '/current_new ' . $this->environment['ssh']['directory'] . '/current')) {
             $this->error(' - an error occurred while releasing build');
         }
         $this->log(' ...OK');
 
-        $this->log('     -> running after deploy script', FALSE);
+        $this->log('     -> running after deploy script', false);
         if (!$this->httpRequest($this->environment['deployScript'] . '?' . $this->releaseName , 'OK')) {
             $this->error(' ...an error occurred while running deploy script');
         }
         $this->log(' ...OK');
 
         $keepBuilds = 5;
-        $this->log('     -> cleaning up old builds', FALSE);
+        $this->log('     -> cleaning up old builds', false);
         if (!$this->ssh('ls ' . $remoteReleaseDirectory . '/* -1td | tail -n +' . ($keepBuilds + 1) . ' | grep -v ' . $this->releaseName . ' | xargs rm -rf')) {
             $this->error(' ...an error occurred while cleaning old build');
         }
@@ -503,10 +503,10 @@ $additionalOptions = ['ssh' => ['passphrase' => $passphrase]];
 $additionalOptions = [
 	'ssh' => [
 		'passphrase' => static function (Deploy $deploy, string $privateKeyFile): string {
-			$passphrase = NULL;
+			$passphrase = null;
 
 			do {
-				echo $passphrase === NULL ? PHP_EOL . '          > Enter SSH key password: ' : '  > Bad password, enter again: ';
+				echo $passphrase === null ? PHP_EOL . '          > Enter SSH key password: ' : '  > Bad password, enter again: ';
 
 				try {
 					$passphrase = Deploy::getHiddenResponse();
