@@ -211,9 +211,7 @@ class Deploy
 		curl_setopt($curl, CURLOPT_RETURNTRANSFER, $validate !== null);
 
 		$returned = curl_exec($curl);
-
 		$errorNo = curl_errno($curl);
-		curl_close($curl);
 
 		if ($validate !== null) {
 			if (!is_string($returned)) {
