@@ -8,7 +8,7 @@ use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 
 /**
- * @phpstan-type AssetsConfig array<string, array{type: string|null, file?: string|null, files?: array<string>, env?: string}|string>
+ * @phpstan-type AssetsConfig array<string, array{type: string|null, file?: string|null, files?: list<string>, env?: string}|string>
  */
 class Assets
 {
@@ -20,6 +20,7 @@ class Assets
 	public const string SASS = 'sass';
 	public const string UGLIFYJS = 'uglifyjs';
 	public const string ROLLUP = 'rollup';
+	public const string WATCH = 'watch';
 
 	private const string DEFAULT_SYSTEM_BIN_PATH = '/usr/bin:/bin';
 
@@ -85,13 +86,10 @@ class Assets
 
 		$oldHash = call_user_func($this->readHash, $this->configFile);
 
-		$files = [];
-		foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->sourceDirectory, RecursiveDirectoryIterator::SKIP_DOTS)) as $item) {
-			assert($item instanceof \SplFileInfo);
-			if ($item->isDir() || (realpath($item->getPathname()) === $lockFile)) {
-				continue;
-			}
-			$files[$item->getPathname()] = $item->getMTime();
+		$files = $this->collectMTimes($this->sourceDirectory, $lockFile);
+
+		foreach ($this->watchPaths() as $watchPath) {
+			$files += $this->collectMTimes($watchPath);
 		}
 
 		$newHash = md5(serialize($this->config) . ($this->localSourceDirectory ?? '') . serialize($files));
@@ -113,13 +111,9 @@ class Assets
 
 		$this->buildAssets(self::PRODUCTION);
 
-		$contents = '';
-		foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($this->sourceDirectory, RecursiveDirectoryIterator::SKIP_DOTS)) as $item) {
-			assert($item instanceof \SplFileInfo);
-			if ($item->isDir() || (realpath($item->getPathname()) === $lockFile)) {
-				continue;
-			}
-			$contents .= file_get_contents($item->getPathname());
+		$contents = $this->collectContents($this->sourceDirectory, $lockFile);
+		foreach ($this->watchPaths() as $watchPath) {
+			$contents .= $this->collectContents($watchPath);
 		}
 
 		call_user_func($this->writeHash, $this->configFile, md5($contents));
@@ -193,6 +187,12 @@ class Assets
 						throw new \InvalidArgumentException(sprintf('No file defined for \'%s\'.', $path));
 					}
 					$this->compilesRollup($data['file'], $path, $isDebug);
+					break;
+
+				case self::WATCH:
+					if (!isset($data['file']) && !isset($data['files'])) {
+						throw new \InvalidArgumentException(sprintf('No file or files defined for \'%s\'.', $path));
+					}
 					break;
 			}
 		}
@@ -280,6 +280,85 @@ class Assets
 			$createMap ? 1 : 0,
 			$this->npxCommand('rollup'),
 		), 'js-rollup');
+	}
+
+
+	/**
+	 * @return list<string>
+	 */
+	private function watchPaths(): array
+	{
+		$paths = [];
+		foreach ($this->config as $path => $data) {
+			if (!is_array($data) || !isset($data['type']) || ($data['type'] !== self::WATCH)) {
+				continue;
+			}
+
+			if (!isset($data['file']) && !isset($data['files'])) {
+				throw new \InvalidArgumentException(sprintf('No \'file\' or \'files\' defined for \'%s\'.', $path));
+			}
+
+			foreach ($data['files'] ?? [$data['file']] as $file) {
+				assert($file !== null);
+
+				$paths[] = $file;
+			}
+		}
+
+		return $paths;
+	}
+
+
+	/**
+	 * @return array<string, int>
+	 */
+	private function collectMTimes(string $path, string|null $lockFile = null): array
+	{
+		if (is_file($path)) {
+			return [$path => (int) filemtime($path)];
+		}
+
+		if (!is_dir($path)) {
+			throw new Exceptions\AssetsException(sprintf('Watched path \'%s\' doesn\'t exists.', $path));
+		}
+
+		$files = [];
+		foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS)) as $item) {
+			assert($item instanceof \SplFileInfo);
+
+			if ($item->isDir() || (realpath($item->getPathname()) === $lockFile)) {
+				continue;
+			}
+
+			$files[$item->getPathname()] = $item->getMTime();
+		}
+
+		return $files;
+	}
+
+
+	private function collectContents(string $path, string|null $lockFile = null): string
+	{
+		if (is_file($path)) {
+			return (string) file_get_contents($path);
+		}
+
+		if (!is_dir($path)) {
+			throw new Exceptions\AssetsException(sprintf('Watched path \'%s\' doesn\'t exists.', $path));
+		}
+
+		$contents = '';
+		foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS)) as $item) {
+			assert($item instanceof \SplFileInfo);
+
+			if ($item->isDir() || (realpath($item->getPathname()) === $lockFile)) {
+				continue;
+			}
+
+			$contents .= file_get_contents($item->getPathname());
+		}
+
+		return $contents;
 	}
 
 

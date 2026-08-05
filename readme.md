@@ -26,7 +26,7 @@ composer require --dev forrest79/deploy-php
 
 ### Assets
 
-This is a simple assets builder. Currently, it supports copying files, compiling and minifying [less](http://lesscss.org/) files, [sass](https://sass-lang.com/) files and JavaScript (simple minifier [UglifyJS](https://github.com/mishoo/UglifyJS) or complex [rollup.js](https://rollupjs.org/) + recommended [Babel](https://babeljs.io/)) files and in debug environment also generating map files.
+This is a simple assets builder. Currently, it supports copying files, compiling and minifying [less](http://lesscss.org/) files, [sass](https://sass-lang.com/) files and JavaScript (simple minifier [UglifyJS](https://github.com/mishoo/UglifyJS) or complex [rollup.js](https://rollupjs.org/) + recommended [Babel](https://babeljs.io/)) files and in debug environment also generating map files. There's also a `DeployPhp\Assets::WATCH` type that doesn't produce any output - it just adds a file or directory into the hash calculation (useful for example for `package-lock.json`, when it's outside the assets source directory).
 
 For compiling and minifying is required `node.js` with installed `npm` packages `less`, `sass`, `uglify-js` or `rollup` (`babel`) environment. In Debian or Ubuntu, you can do it like this (`-g` option install package globally in the system, not in your repository):
 
@@ -52,12 +52,13 @@ npm install rollup @rollup/plugin-node-resolve @rollup/plugin-commonjs rollup-pl
 
 Using is straightforward. Examples show how this works with [Nette Framework](https://github.com/nette/nette). Just create new instance `Forrest79\DeployPhp\Assets` class and pass temp directory, assets source directory and configuration array to constructor. `key` is a directory to process (for ```DeployPhp\Assets::COPY```) or target file (for `DeployPhp\Assets::UGLIFYJS`, `DeployPhp\Assets::ROLLUP` or `DeployPhp\Assets::LESS`) or directory (for `DeployPhp\Assets::SASS`) for source data and `value` can be simple `DeployPhp\Assets::COPY` which tells to copy this file/directory from source to destination or another `array` with items:
 
-- required `type` - with value `DeployPhp\Assets::COPY` to copy file/directory or `DeployPhp\Assets::LESS` to compile and minify less to CSS or `DeployPhp\Assets::UGLIFYJS` to concatenate and minify JavaScripts or `DeployPhp\Assets::ROLLUP` to use modern JavaScript environment
+- required `type` - with value `DeployPhp\Assets::COPY` to copy file/directory or `DeployPhp\Assets::LESS` to compile and minify less to CSS or `DeployPhp\Assets::UGLIFYJS` to concatenate and minify JavaScripts or `DeployPhp\Assets::ROLLUP` to use modern JavaScript environment or `DeployPhp\Assets::WATCH` to only include a file/directory in the hash calculation, without producing any output
 - optional `env` - if missing, this item is processed for debug and production environment, or you can specify concrete environment `DeployPhp\Assets::DEBUG` or `DeployPhp\Assets::PRODUCTION`
 - required `file` for `type => DeployPhp\Assets::LESS` - with source file to compile and minify
 - required `file` or `files` for `type => DeployPhp\Assets::SASS` - with source file or files to compile and minify
 - required `files` for `type => DeployPhp\Assets::UGLIFYJS` - with source files to concatenate and minify
 - required `file` for `type => DeployPhp\Assets::ROLLUP` - with source file to process (example configuration is below)
+- required `file` or `files` for `type => DeployPhp\Assets::WATCH` - with a file or directory (not necessarily inside the assets source directory) whose timestamp (debug) or content (production) is included in the hash
 
 The next two parameters are callable function, the first is for reading hash from file, and the second is to write hash to file. In example is shown, how you can write it to neon and use it with Nette DI.
 
@@ -173,10 +174,14 @@ return (new DeployPhp\Assets(
             'type' => DeployPhp\Assets::COPY,
             'env' => DeployPhp\Assets::DEBUG,
         ],
-		'js/scripts.{format}.js' => [ // target file - will be compiled for more formats
-			'type' => DeployPhp\Assets::ROLLUP,
-			'file' => 'js/index.js',
-		],
+        'js/scripts.{format}.js' => [ // target file - will be compiled for more formats
+            'type' => DeployPhp\Assets::ROLLUP,
+            'file' => 'js/index.js',
+        ],
+        'package-lock.json-watch' => [ // key is just a label, no output is produced
+            'type' => DeployPhp\Assets::WATCH,
+            'file' => __DIR__ . '/../package-lock.json',
+        ],
     ],
     static function (string $configFile): ?string {
         if (!file_exists($configFile)) {
