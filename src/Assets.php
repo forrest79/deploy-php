@@ -323,7 +323,7 @@ class Assets
 		}
 
 		$files = [];
-		foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS)) as $item) {
+		foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS | RecursiveDirectoryIterator::FOLLOW_SYMLINKS)) as $item) {
 			assert($item instanceof \SplFileInfo);
 
 			if ($item->isDir() || (realpath($item->getPathname()) === $lockFile)) {
@@ -348,7 +348,7 @@ class Assets
 		}
 
 		$contents = '';
-		foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS)) as $item) {
+		foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS | RecursiveDirectoryIterator::FOLLOW_SYMLINKS)) as $item) {
 			assert($item instanceof \SplFileInfo);
 
 			if ($item->isDir() || (realpath($item->getPathname()) === $lockFile)) {
