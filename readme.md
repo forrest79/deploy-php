@@ -352,7 +352,7 @@ class Deploy extends DeployPhp\Deploy
                 'username' => 'forrest79',
                 'private_key' => 'C:\\Certificates\\certificate',
                 'passphrase' => null, // is completed dynamically - if needed (agent is tried at first), can be also callback call when password is needed
-				'ssh_agent' => SSH_AGENT_SOCK, // true - try to read from env variable, string - socket file
+                'ssh_agent' => SSH_AGENT_SOCK, // true - try to read from env variable, string - socket file
             ],
             'deployScript' => 'https://www.site.com/deploy.php',
         ]
@@ -506,25 +506,25 @@ $additionalOptions = ['ssh' => ['passphrase' => $passphrase]];
 */
 
 $additionalOptions = [
-	'ssh' => [
-		'passphrase' => static function (Deploy $deploy, string $privateKeyFile): string {
-			$passphrase = null;
+    'ssh' => [
+        'passphrase' => static function (Deploy $deploy, string $privateKeyFile): string {
+            $passphrase = null;
 
-			do {
-				echo $passphrase === null ? PHP_EOL . '          > Enter SSH key password: ' : '  > Bad password, enter again: ';
+            do {
+                echo $passphrase === null ? PHP_EOL . '          > Enter SSH key password: ' : '  > Bad password, enter again: ';
 
-				try {
-					$passphrase = Deploy::getHiddenResponse();
-					echo PHP_EOL . '        ';
-				} catch (RuntimeException) {
-					echo '[Can\'t get hidden response, password will be visible]: ';
-					$passphrase = Deploy::getResponse();
-				}
-			} while (!$deploy->validatePrivateKey($privateKeyFile, $passphrase));
+                try {
+                    $passphrase = Deploy::getHiddenResponse();
+                    echo PHP_EOL . '        ';
+                } catch (RuntimeException) {
+                    echo '[Can\'t get hidden response, password will be visible]: ';
+                    $passphrase = Deploy::getResponse();
+                }
+            } while (!$deploy->validatePrivateKey($privateKeyFile, $passphrase));
 
-			return $passphrase;
-		},
-	],
+            return $passphrase;
+        },
+    ],
 ];
 
 if ($argc > 2) {
@@ -573,8 +573,8 @@ prepare-monocomposer (source is below)
 <?php declare(strict_types=1);
 
 (new Forrest79\DeployPhp\ComposerMonorepo(__DIR__ . '/composer.json', '--ignore-platform-reqs'))->updateSynchronize([
-	'appA' => __DIR__ . '/apps/appA/composer.json',
-	'appB' => __DIR__ . '/apps/appB/composer.json',
+    'appA' => __DIR__ . '/apps/appA/composer.json',
+    'appB' => __DIR__ . '/apps/appB/composer.json',
 ]);
 ```
 
