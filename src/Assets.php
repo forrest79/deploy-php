@@ -21,7 +21,6 @@ class Assets
 	public const string UGLIFYJS = 'uglifyjs';
 	public const string ROLLUP = 'rollup';
 	public const string ESBUILD = 'esbuild';
-	public const string WATCH = 'watch';
 
 	private const string DEFAULT_SYSTEM_BIN_PATH = '/usr/bin:/bin';
 
@@ -33,6 +32,12 @@ class Assets
 
 	/** function (string $configFile, string $hash): void */
 	private Closure $writeHash;
+
+	/** @var list<string> */
+	private array $watch;
+
+	/** @var list<string> */
+	private array $unwatch;
 
 	private string $sourceDirectory;
 
@@ -46,12 +51,17 @@ class Assets
 
 	private string $lockFile;
 
+	/** @var list<string>|null */
+	private array|null $unwatchPathsResolved = null;
+
 	/** @var resource */
 	private $lockHandle;
 
 
 	/**
 	 * @phpstan-param AssetsConfig $config
+	 * @param list<string> $watch
+	 * @param list<string> $unwatch
 	 * @param array<string, string> $localConfig
 	 */
 	public function __construct(
@@ -60,12 +70,16 @@ class Assets
 		array $config,
 		Closure $readHash,
 		Closure $writeHash,
+		array $watch = [],
+		array $unwatch = [],
 		array $localConfig = [],
 	)
 	{
 		$this->sourceDirectory = rtrim($sourceDirectory, '\\/');
 
 		$this->config = $config;
+		$this->watch = $watch;
+		$this->unwatch = $unwatch;
 		$this->readHash = $readHash;
 		$this->writeHash = $writeHash;
 
@@ -89,7 +103,7 @@ class Assets
 
 		$files = $this->collectMTimes($this->sourceDirectory, $lockFile);
 
-		foreach ($this->watchPaths() as $watchPath) {
+		foreach ($this->watch as $watchPath) {
 			$files += $this->collectMTimes($watchPath);
 		}
 
@@ -113,7 +127,7 @@ class Assets
 		$this->buildAssets(self::PRODUCTION);
 
 		$contents = $this->collectContents($this->sourceDirectory, $lockFile);
-		foreach ($this->watchPaths() as $watchPath) {
+		foreach ($this->watch as $watchPath) {
 			$contents .= $this->collectContents($watchPath);
 		}
 
@@ -195,12 +209,6 @@ class Assets
 						throw new \InvalidArgumentException(sprintf('No file defined for \'%s\'.', $path));
 					}
 					$this->compilesEsbuild($data['file'], $path, $data['tsconfig'] ?? null, $isDebug);
-					break;
-
-				case self::WATCH:
-					if (!isset($data['file']) && !isset($data['files'])) {
-						throw new \InvalidArgumentException(sprintf('No file or files defined for \'%s\'.', $path));
-					}
 					break;
 			}
 		}
@@ -291,7 +299,12 @@ class Assets
 	}
 
 
-	private function compilesEsbuild(string $sourceFile, string $destinationFile, string|null $tsconfig, bool $createMap): void
+	private function compilesEsbuild(
+		string $sourceFile,
+		string $destinationFile,
+		string|null $tsconfig,
+		bool $createMap,
+	): void
 	{
 		$this->exec(sprintf(
 			'%s %s --bundle --format=iife %s--outfile=%s%s',
@@ -305,37 +318,15 @@ class Assets
 
 
 	/**
-	 * @return list<string>
-	 */
-	private function watchPaths(): array
-	{
-		$paths = [];
-		foreach ($this->config as $path => $data) {
-			if (!is_array($data) || !isset($data['type']) || ($data['type'] !== self::WATCH)) {
-				continue;
-			}
-
-			if (!isset($data['file']) && !isset($data['files'])) {
-				throw new \InvalidArgumentException(sprintf('No \'file\' or \'files\' defined for \'%s\'.', $path));
-			}
-
-			foreach ($data['files'] ?? [$data['file']] as $file) {
-				assert($file !== null);
-
-				$paths[] = $file;
-			}
-		}
-
-		return $paths;
-	}
-
-
-	/**
 	 * @return array<string, int>
 	 */
 	private function collectMTimes(string $path, string|null $lockFile = null): array
 	{
 		if (is_file($path)) {
+			if ($this->isUnwatched(realpath($path))) {
+				return [];
+			}
+
 			return [$path => (int) filemtime($path)];
 		}
 
@@ -347,7 +338,8 @@ class Assets
 		foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS | RecursiveDirectoryIterator::FOLLOW_SYMLINKS)) as $item) {
 			assert($item instanceof \SplFileInfo);
 
-			if ($item->isDir() || (realpath($item->getPathname()) === $lockFile)) {
+			$realPath = realpath($item->getPathname());
+			if ($item->isDir() || ($realPath === $lockFile) || $this->isUnwatched($realPath)) {
 				continue;
 			}
 
@@ -361,6 +353,10 @@ class Assets
 	private function collectContents(string $path, string|null $lockFile = null): string
 	{
 		if (is_file($path)) {
+			if ($this->isUnwatched(realpath($path))) {
+				return '';
+			}
+
 			return (string) file_get_contents($path);
 		}
 
@@ -372,7 +368,8 @@ class Assets
 		foreach (new RecursiveIteratorIterator(new RecursiveDirectoryIterator($path, RecursiveDirectoryIterator::SKIP_DOTS | RecursiveDirectoryIterator::FOLLOW_SYMLINKS)) as $item) {
 			assert($item instanceof \SplFileInfo);
 
-			if ($item->isDir() || (realpath($item->getPathname()) === $lockFile)) {
+			$realPath = realpath($item->getPathname());
+			if ($item->isDir() || ($realPath === $lockFile) || $this->isUnwatched($realPath)) {
 				continue;
 			}
 
@@ -380,6 +377,45 @@ class Assets
 		}
 
 		return $contents;
+	}
+
+
+	private function isUnwatched(string|false $realPath): bool
+	{
+		if ($realPath !== false) {
+			foreach ($this->unwatchPaths() as $unwatchPath) {
+				if ($realPath === $unwatchPath) {
+					return true;
+				} else if (str_ends_with($unwatchPath, DIRECTORY_SEPARATOR) && str_starts_with($realPath, $unwatchPath)) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+
+	/**
+	 * @return list<string>
+	 */
+	private function unwatchPaths(): array
+	{
+		if ($this->unwatchPathsResolved === null) {
+			$paths = [];
+			foreach ($this->unwatch as $path) {
+				$realPath = realpath($path);
+				if ($realPath === false) {
+					throw new Exceptions\AssetsException(sprintf('Unwatched path \'%s\' doesn\'t exists.', $path));
+				}
+
+				$paths[] = is_dir($realPath) ? ($realPath . DIRECTORY_SEPARATOR) : $realPath;
+			}
+
+			$this->unwatchPathsResolved = $paths;
+		}
+
+		return $this->unwatchPathsResolved;
 	}
 
 

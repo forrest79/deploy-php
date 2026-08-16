@@ -26,7 +26,7 @@ composer require --dev forrest79/deploy-php
 
 ### Assets
 
-This is a simple assets builder. Currently, it supports copying files, compiling and minifying [less](http://lesscss.org/) files, [sass](https://sass-lang.com/) files and JavaScript/TypeScript (simple minifier [UglifyJS](https://github.com/mishoo/UglifyJS), complex [rollup.js](https://rollupjs.org/) + recommended [Babel](https://babeljs.io/), or [esbuild](https://esbuild.github.io/)) files and in debug environment also generating map files. There's also a `DeployPhp\Assets::WATCH` type that doesn't produce any output - it just adds a file or directory into the hash calculation (useful for example for `package-lock.json`, when it's outside the assets source directory).
+This is a simple assets builder. Currently, it supports copying files, compiling and minifying [less](http://lesscss.org/) files, [sass](https://sass-lang.com/) files and JavaScript/TypeScript (simple minifier [UglifyJS](https://github.com/mishoo/UglifyJS), complex [rollup.js](https://rollupjs.org/) + recommended [Babel](https://babeljs.io/), or [esbuild](https://esbuild.github.io/)) files and in debug environment also generating map files. Besides the assets configuration, you can also pass a `$watch` list of files/directories (not necessarily inside the assets source directory) whose timestamp (debug) or content (production) is included in the hash calculation without producing any output, and an `$unwatch` list of files/directories to exclude from the hash calculation, even when they're inside the assets source directory or one of the watched paths.
 
 For compiling and minifying is required `node.js` with installed `npm` packages `less`, `sass`, `uglify-js`, `rollup` (`babel`) or `esbuild` environment. In Debian or Ubuntu, you can do it like this (`-g` option install package globally in the system, not in your repository):
 
@@ -56,7 +56,7 @@ npm install esbuild
 
 Using is straightforward. Examples show how this works with [Nette Framework](https://github.com/nette/nette). Just create new instance `Forrest79\DeployPhp\Assets` class and pass temp directory, assets source directory and configuration array to constructor. `key` is a directory to process (for `DeployPhp\Assets::COPY`) or target file (for `DeployPhp\Assets::UGLIFYJS`, `DeployPhp\Assets::ROLLUP`, `DeployPhp\Assets::ESBUILD` or `DeployPhp\Assets::LESS`) or directory (for `DeployPhp\Assets::SASS`) for source data and `value` can be simple `DeployPhp\Assets::COPY` which tells to copy this file/directory from source to destination or another `array` with items:
 
-- required `type` - with value `DeployPhp\Assets::COPY` to copy file/directory or `DeployPhp\Assets::LESS` to compile and minify less to CSS or `DeployPhp\Assets::UGLIFYJS` to concatenate and minify JavaScripts or `DeployPhp\Assets::ROLLUP` to use modern JavaScript environment or `DeployPhp\Assets::ESBUILD` to bundle and minify JavaScript/TypeScript with [esbuild](https://esbuild.github.io/) or `DeployPhp\Assets::WATCH` to only include a file/directory in the hash calculation, without producing any output
+- required `type` - with value `DeployPhp\Assets::COPY` to copy file/directory or `DeployPhp\Assets::LESS` to compile and minify less to CSS or `DeployPhp\Assets::UGLIFYJS` to concatenate and minify JavaScripts or `DeployPhp\Assets::ROLLUP` to use modern JavaScript environment or `DeployPhp\Assets::ESBUILD` to bundle and minify JavaScript/TypeScript with [esbuild](https://esbuild.github.io/)
 - optional `env` - if missing, this item is processed for debug and production environment, or you can specify concrete environment `DeployPhp\Assets::DEBUG` or `DeployPhp\Assets::PRODUCTION`
 - required `file` for `type => DeployPhp\Assets::LESS` - with source file to compile and minify
 - required `file` or `files` for `type => DeployPhp\Assets::SASS` - with source file or files to compile and minify
@@ -64,11 +64,15 @@ Using is straightforward. Examples show how this works with [Nette Framework](ht
 - required `file` for `type => DeployPhp\Assets::ROLLUP` - with source file to process (example configuration is below)
 - required `file` for `type => DeployPhp\Assets::ESBUILD` - with source file to bundle
 - optional `tsconfig` for `type => DeployPhp\Assets::ESBUILD` - path (relative to the assets source directory) to a `tsconfig.json` to pass to esbuild; if not set, esbuild runs without a `--tsconfig` flag
-- required `file` or `files` for `type => DeployPhp\Assets::WATCH` - with a file or directory (not necessarily inside the assets source directory) whose timestamp (debug) or content (production) is included in the hash
 
-The next two parameters are callable function, the first is for reading hash from file, and the second is to write hash to file. In example is shown, how you can write it to neon and use it with Nette DI.
+The next two parameters are callable functions, the first is for reading hash from file, and the second is to write hash to file. In example is shown, how you can write it to neon and use it with Nette DI.
 
-Last (fourth) parameter is optional and define an array with optional settings. More about this is under the example.
+After them come two optional parameters, both lists of file/directory paths:
+
+- `$watch` - files/directories that don't have to be inside the assets source directory - their timestamp (debug) or content (production) is included in the hash calculation, without producing any output. Useful for example for `package-lock.json`, when it's outside the assets source directory.
+- `$unwatch` - files/directories to exclude from the hash calculation, even when they're inside the assets source directory or one of the `$watch` paths. Useful for example to exclude a `node_modules` directory that lives inside the assets source directory (e.g. needed there for esbuild/rollup module resolution) from constantly triggering rebuilds.
+
+Last (sixth) parameter is optional and define an array with optional settings. More about this is under the example.
 
 To build assets you need first call `buildDebug($configNeon, $destinationDirectory)` or `buildProduction($configNeon, $destinationDirectory)` method.
 
@@ -218,10 +222,6 @@ return (new DeployPhp\Assets(
             'file' => 'ts/app.ts',
             'tsconfig' => 'ts/tsconfig.json', // optional, omit to run esbuild without a tsconfig
         ],
-        'package-lock.json-watch' => [ // key is just a label, no output is produced
-            'type' => DeployPhp\Assets::WATCH,
-            'file' => __DIR__ . '/../package-lock.json',
-        ],
     ],
     static function (string $configFile): ?string {
         if (!file_exists($configFile)) {
@@ -238,6 +238,12 @@ return (new DeployPhp\Assets(
     static function (string $configFile, string $hash): void {
         file_put_contents($configFile, "assets:\n\t\thash: $hash\n");
     },
+    [
+        __DIR__ . '/../package-lock.json', // outside the assets source directory, but its content should still trigger a rebuild
+    ],
+    [
+        __DIR__ . '/assets/node_modules', // inside the assets source directory (needed there e.g. for esbuild/rollup imports), but shouldn't trigger a rebuild on every "npm install"
+    ],
     ((($localConfig = @include __DIR__ . '/assets.local.php') === false) ? [] : $localConfig)
 );
 ```
