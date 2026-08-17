@@ -16,9 +16,7 @@ class Assets
 	public const string PRODUCTION = 'production';
 
 	public const string COPY = 'copy';
-	public const string LESS = 'less';
 	public const string SASS = 'sass';
-	public const string UGLIFYJS = 'uglifyjs';
 	public const string ROLLUP = 'rollup';
 	public const string ESBUILD = 'esbuild';
 
@@ -183,13 +181,6 @@ class Assets
 			}
 
 			switch ($data['type']) {
-				case self::LESS:
-					if (!isset($data['file'])) {
-						throw new \InvalidArgumentException(sprintf('No file defined for \'%s\'.', $path));
-					}
-					$this->compilesLess($data['file'], $path, $isDebug);
-					break;
-
 				case self::SASS:
 					if (!isset($data['file']) && !isset($data['files'])) {
 						throw new \InvalidArgumentException(sprintf('No file or files defined for \'%s\'.', $path));
@@ -198,13 +189,6 @@ class Assets
 						assert($file !== null);
 						$this->compilesSass($file, $path . DIRECTORY_SEPARATOR . pathinfo($file, PATHINFO_FILENAME) . '.css', $isDebug);
 					}
-					break;
-
-				case self::UGLIFYJS:
-					if (!isset($data['files'])) {
-						throw new \InvalidArgumentException(sprintf('No files defined for \'%s\'.', $path));
-					}
-					$this->compilesJs($data['files'], $path, $isDebug);
 					break;
 
 				case self::ROLLUP:
@@ -225,24 +209,6 @@ class Assets
 	}
 
 
-	private function compilesLess(string $sourceFile, string $destinationFile, bool $createMap): void
-	{
-		$mapCommand = '';
-		if ($createMap) {
-			$sourceMapDirectory = dirname($this->localSourceDirectory !== null ? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $sourceFile) : $sourceFile);
-			$mapCommand = sprintf('--source-map --source-map-rootpath=file:///%s ', $sourceMapDirectory);
-		}
-
-		$this->exec(sprintf(
-			'%s --clean-css="--keepSpecialComments=0" %s%s %s',
-			$this->npxCommand('node-sass'),
-			$mapCommand,
-			$sourceFile,
-			$this->prepareDestinationPath($destinationFile),
-		), 'css-less');
-	}
-
-
 	private function compilesSass(string $sourceFile, string $destinationFile, bool $createMap): void
 	{
 		$destinationPath = $this->prepareDestinationPath($destinationFile);
@@ -257,48 +223,6 @@ class Assets
 
 		if ($createMap) {
 			$this->absolutizeSourceMap($destinationPath . '.map');
-		}
-	}
-
-
-	/**
-	 * @param list<string> $sourceFiles
-	 */
-	private function compilesJs(array $sourceFiles, string $destinationFile, bool $createMap): void
-	{
-		$destinationFile = $this->prepareDestinationPath($destinationFile);
-
-		$mapSources = [];
-
-		if ($createMap) {
-			foreach ($sourceFiles as $sourceFile) {
-				$sourcePath = $this->sourceDirectory . DIRECTORY_SEPARATOR . $sourceFile;
-				$mapSources[$sourcePath] = 'file:///' . ($this->localSourceDirectory !== null
-					? ($this->localSourceDirectory . DIRECTORY_SEPARATOR . $sourceFile)
-					: realpath($sourcePath));
-			}
-		}
-
-		$mapCommand = '';
-		if ($createMap) {
-			$mapCommand = sprintf('--source-map url=%s.map ', basename($destinationFile));
-		}
-
-		$this->exec(sprintf(
-			'%s %s -o %s --compress %s',
-			$this->npxCommand('uglifyjs'),
-			implode(' ', $sourceFiles),
-			$destinationFile,
-			$mapCommand,
-		), 'js-uglifyjs');
-
-		if ($createMap) {
-			$mapFile = $destinationFile . '.map';
-			$mapContents = file_get_contents($mapFile);
-			if ($mapContents === false) {
-				throw new Exceptions\AssetsException(sprintf('Map file \'%s\' doesn\'t exists', $mapFile));
-			}
-			file_put_contents($mapFile, strtr($mapContents, $mapSources));
 		}
 	}
 

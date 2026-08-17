@@ -26,25 +26,17 @@ composer require --dev forrest79/deploy-php
 
 ### Assets
 
-This is a simple assets builder. Currently, it supports copying files, compiling and minifying [less](http://lesscss.org/) files, [sass](https://sass-lang.com/) files and JavaScript/TypeScript (simple minifier [UglifyJS](https://github.com/mishoo/UglifyJS), complex [rollup.js](https://rollupjs.org/) + recommended [Babel](https://babeljs.io/), or [esbuild](https://esbuild.github.io/)) files and in debug environment also generating map files. Besides the assets configuration, you can also pass a `$watch` list of files/directories (not necessarily inside the assets source directory) whose timestamp (debug) or content (production) is included in the hash calculation without producing any output, and an `$unwatch` list of files/directories to exclude from the hash calculation, even when they're inside the assets source directory or one of the watched paths.
+This is a simple assets builder. Currently, it supports copying files, compiling and minifying [sass](https://sass-lang.com/) files and JavaScript/TypeScript (complex [rollup.js](https://rollupjs.org/) + recommended [Babel](https://babeljs.io/), or [esbuild](https://esbuild.github.io/)) files and in debug environment also generating map files. Besides the assets configuration, you can also pass a `$watch` list of files/directories (not necessarily inside the assets source directory) whose timestamp (debug) or content (production) is included in the hash calculation without producing any output, and an `$unwatch` list of files/directories to exclude from the hash calculation, even when they're inside the assets source directory or one of the watched paths.
 
-For compiling and minifying is required `node.js` with installed `npm` packages `less`, `sass`, `uglify-js`, `rollup` (`babel`) or `esbuild` environment. In Debian or Ubuntu, you can do it like this (`-g` option install package globally in the system, not in your repository):
+For compiling and minifying is required `node.js` with installed `npm` packages `sass`, `rollup` (`babel`) or `esbuild` environment. In Debian or Ubuntu, you can do it like this (`-g` option install package globally in the system, not in your repository):
 
 ```bash
 curl -sL https://deb.nodesource.com/setup_15.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
-# LESS compiler
-npm install less
-#sudo npm install -g less
-
 # SASS compiler
 npm install sass
 #sudo npm install -g sass
-
-# UglifyJS compiler
-npm install uglify-js
-#sudo npm install -g uglify-js
 
 # Babel and Rollup (prefer not to install this globally)
 npm install rollup @rollup/plugin-node-resolve @rollup/plugin-commonjs rollup-plugin-terser @rollup/plugin-babel @babel/core @babel/preset-env @babel/plugin-transform-runtime core-js
@@ -54,13 +46,11 @@ npm install esbuild
 #sudo npm install -g esbuild
 ```
 
-Using is straightforward. Examples show how this works with [Nette Framework](https://github.com/nette/nette). Just create new instance `Forrest79\DeployPhp\Assets` class and pass temp directory, assets source directory and configuration array to constructor. `key` is a directory to process (for `DeployPhp\Assets::COPY`) or target file (for `DeployPhp\Assets::UGLIFYJS`, `DeployPhp\Assets::ROLLUP`, `DeployPhp\Assets::ESBUILD` or `DeployPhp\Assets::LESS`) or directory (for `DeployPhp\Assets::SASS`) for source data and `value` can be simple `DeployPhp\Assets::COPY` which tells to copy this file/directory from source to destination or another `array` with items:
+Using is straightforward. Examples show how this works with [Nette Framework](https://github.com/nette/nette). Just create new instance `Forrest79\DeployPhp\Assets` class and pass temp directory, assets source directory and configuration array to constructor. `key` is a directory to process (for `DeployPhp\Assets::COPY`) or target file (for `DeployPhp\Assets::ROLLUP` or `DeployPhp\Assets::ESBUILD`) or directory (for `DeployPhp\Assets::SASS`) for source data and `value` can be simple `DeployPhp\Assets::COPY` which tells to copy this file/directory from source to destination or another `array` with items:
 
-- required `type` - with value `DeployPhp\Assets::COPY` to copy file/directory or `DeployPhp\Assets::LESS` to compile and minify less to CSS or `DeployPhp\Assets::UGLIFYJS` to concatenate and minify JavaScripts or `DeployPhp\Assets::ROLLUP` to use modern JavaScript environment or `DeployPhp\Assets::ESBUILD` to bundle and minify JavaScript/TypeScript with [esbuild](https://esbuild.github.io/)
+- required `type` - with value `DeployPhp\Assets::COPY` to copy file/directory or `DeployPhp\Assets::SASS` to compile and minify sass to CSS or `DeployPhp\Assets::ROLLUP` to use modern JavaScript environment or `DeployPhp\Assets::ESBUILD` to bundle and minify JavaScript/TypeScript with [esbuild](https://esbuild.github.io/)
 - optional `env` - if missing, this item is processed for debug and production environment, or you can specify concrete environment `DeployPhp\Assets::DEBUG` or `DeployPhp\Assets::PRODUCTION`
-- required `file` for `type => DeployPhp\Assets::LESS` - with source file to compile and minify
 - required `file` or `files` for `type => DeployPhp\Assets::SASS` - with source file or files to compile and minify
-- required `files` for `type => DeployPhp\Assets::UGLIFYJS` - with source files to concatenate and minify
 - required `file` for `type => DeployPhp\Assets::ROLLUP` - with source file to process (example configuration is below)
 - required `file` for `type => DeployPhp\Assets::ESBUILD` - with source file to bundle
 - optional `tsconfig` for `type => DeployPhp\Assets::ESBUILD` - path (relative to the assets source directory) to a `tsconfig.json` to pass to esbuild; if not set, esbuild runs without a `--tsconfig` flag
@@ -185,10 +175,6 @@ return (new DeployPhp\Assets(
     [
         'images' => DeployPhp\Assets::COPY,
         'fonts' => DeployPhp\Assets::COPY,
-        'css/styles.css' => [ // target file
-            'type' => DeployPhp\Assets::LESS,
-            'file' => 'css/main.less',
-        ],
         'css/styles' => [ // target directory, main.css will be created here
             'type' => DeployPhp\Assets::SASS,
             'file' => 'css/main.sass',
@@ -199,14 +185,6 @@ return (new DeployPhp\Assets(
                 'css/main.sass',
                 'css/print.sass',
             ]
-        ],
-        'js/scripts.js' => [ // target file
-            'type' => DeployPhp\Assets::JS,
-            'files' => [
-                'js/bootstrap.js',
-                'js/modernizr-custom.js',
-                'js/web.js',
-            ],
         ],
         'js/jquery.min.js' => DeployPhp\Assets::COPY,
         'js/jquery.min.map' => [
