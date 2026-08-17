@@ -8,7 +8,7 @@ use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 
 /**
- * @phpstan-type AssetsConfig array<string, array{type: string|null, file?: string|null, files?: list<string>, env?: string}|string>
+ * @phpstan-type AssetsConfig array<string, array{type: string|null, file?: string|null, files?: list<string>, env?: string, tsconfig?: string|null}|string>
  */
 class Assets
 {
@@ -20,6 +20,7 @@ class Assets
 	public const string SASS = 'sass';
 	public const string UGLIFYJS = 'uglifyjs';
 	public const string ROLLUP = 'rollup';
+	public const string ESBUILD = 'esbuild';
 	public const string WATCH = 'watch';
 
 	private const string DEFAULT_SYSTEM_BIN_PATH = '/usr/bin:/bin';
@@ -189,6 +190,13 @@ class Assets
 					$this->compilesRollup($data['file'], $path, $isDebug);
 					break;
 
+				case self::ESBUILD:
+					if (!isset($data['file'])) {
+						throw new \InvalidArgumentException(sprintf('No file defined for \'%s\'.', $path));
+					}
+					$this->compilesEsbuild($data['file'], $path, $data['tsconfig'] ?? null, $isDebug);
+					break;
+
 				case self::WATCH:
 					if (!isset($data['file']) && !isset($data['files'])) {
 						throw new \InvalidArgumentException(sprintf('No file or files defined for \'%s\'.', $path));
@@ -280,6 +288,19 @@ class Assets
 			$createMap ? 1 : 0,
 			$this->npxCommand('rollup'),
 		), 'js-rollup');
+	}
+
+
+	private function compilesEsbuild(string $sourceFile, string $destinationFile, string|null $tsconfig, bool $createMap): void
+	{
+		$this->exec(sprintf(
+			'%s %s --bundle --format=iife %s--outfile=%s%s',
+			$this->npxCommand('esbuild'),
+			$sourceFile,
+			$tsconfig !== null ? sprintf('--tsconfig=%s ', $tsconfig) : '',
+			$this->prepareDestinationPath($destinationFile),
+			$createMap ? ' --sourcemap' : ' --minify',
+		), 'js-esbuild');
 	}
 
 

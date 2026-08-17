@@ -26,9 +26,9 @@ composer require --dev forrest79/deploy-php
 
 ### Assets
 
-This is a simple assets builder. Currently, it supports copying files, compiling and minifying [less](http://lesscss.org/) files, [sass](https://sass-lang.com/) files and JavaScript (simple minifier [UglifyJS](https://github.com/mishoo/UglifyJS) or complex [rollup.js](https://rollupjs.org/) + recommended [Babel](https://babeljs.io/)) files and in debug environment also generating map files. There's also a `DeployPhp\Assets::WATCH` type that doesn't produce any output - it just adds a file or directory into the hash calculation (useful for example for `package-lock.json`, when it's outside the assets source directory).
+This is a simple assets builder. Currently, it supports copying files, compiling and minifying [less](http://lesscss.org/) files, [sass](https://sass-lang.com/) files and JavaScript/TypeScript (simple minifier [UglifyJS](https://github.com/mishoo/UglifyJS), complex [rollup.js](https://rollupjs.org/) + recommended [Babel](https://babeljs.io/), or [esbuild](https://esbuild.github.io/)) files and in debug environment also generating map files. There's also a `DeployPhp\Assets::WATCH` type that doesn't produce any output - it just adds a file or directory into the hash calculation (useful for example for `package-lock.json`, when it's outside the assets source directory).
 
-For compiling and minifying is required `node.js` with installed `npm` packages `less`, `sass`, `uglify-js` or `rollup` (`babel`) environment. In Debian or Ubuntu, you can do it like this (`-g` option install package globally in the system, not in your repository):
+For compiling and minifying is required `node.js` with installed `npm` packages `less`, `sass`, `uglify-js`, `rollup` (`babel`) or `esbuild` environment. In Debian or Ubuntu, you can do it like this (`-g` option install package globally in the system, not in your repository):
 
 ```bash
 curl -sL https://deb.nodesource.com/setup_15.x | sudo -E bash -
@@ -48,16 +48,22 @@ npm install uglify-js
 
 # Babel and Rollup (prefer not to install this globally)
 npm install rollup @rollup/plugin-node-resolve @rollup/plugin-commonjs rollup-plugin-terser @rollup/plugin-babel @babel/core @babel/preset-env @babel/plugin-transform-runtime core-js
+
+# esbuild
+npm install esbuild
+#sudo npm install -g esbuild
 ```
 
-Using is straightforward. Examples show how this works with [Nette Framework](https://github.com/nette/nette). Just create new instance `Forrest79\DeployPhp\Assets` class and pass temp directory, assets source directory and configuration array to constructor. `key` is a directory to process (for ```DeployPhp\Assets::COPY```) or target file (for `DeployPhp\Assets::UGLIFYJS`, `DeployPhp\Assets::ROLLUP` or `DeployPhp\Assets::LESS`) or directory (for `DeployPhp\Assets::SASS`) for source data and `value` can be simple `DeployPhp\Assets::COPY` which tells to copy this file/directory from source to destination or another `array` with items:
+Using is straightforward. Examples show how this works with [Nette Framework](https://github.com/nette/nette). Just create new instance `Forrest79\DeployPhp\Assets` class and pass temp directory, assets source directory and configuration array to constructor. `key` is a directory to process (for `DeployPhp\Assets::COPY`) or target file (for `DeployPhp\Assets::UGLIFYJS`, `DeployPhp\Assets::ROLLUP`, `DeployPhp\Assets::ESBUILD` or `DeployPhp\Assets::LESS`) or directory (for `DeployPhp\Assets::SASS`) for source data and `value` can be simple `DeployPhp\Assets::COPY` which tells to copy this file/directory from source to destination or another `array` with items:
 
-- required `type` - with value `DeployPhp\Assets::COPY` to copy file/directory or `DeployPhp\Assets::LESS` to compile and minify less to CSS or `DeployPhp\Assets::UGLIFYJS` to concatenate and minify JavaScripts or `DeployPhp\Assets::ROLLUP` to use modern JavaScript environment or `DeployPhp\Assets::WATCH` to only include a file/directory in the hash calculation, without producing any output
+- required `type` - with value `DeployPhp\Assets::COPY` to copy file/directory or `DeployPhp\Assets::LESS` to compile and minify less to CSS or `DeployPhp\Assets::UGLIFYJS` to concatenate and minify JavaScripts or `DeployPhp\Assets::ROLLUP` to use modern JavaScript environment or `DeployPhp\Assets::ESBUILD` to bundle and minify JavaScript/TypeScript with [esbuild](https://esbuild.github.io/) or `DeployPhp\Assets::WATCH` to only include a file/directory in the hash calculation, without producing any output
 - optional `env` - if missing, this item is processed for debug and production environment, or you can specify concrete environment `DeployPhp\Assets::DEBUG` or `DeployPhp\Assets::PRODUCTION`
 - required `file` for `type => DeployPhp\Assets::LESS` - with source file to compile and minify
 - required `file` or `files` for `type => DeployPhp\Assets::SASS` - with source file or files to compile and minify
 - required `files` for `type => DeployPhp\Assets::UGLIFYJS` - with source files to concatenate and minify
 - required `file` for `type => DeployPhp\Assets::ROLLUP` - with source file to process (example configuration is below)
+- required `file` for `type => DeployPhp\Assets::ESBUILD` - with source file to bundle
+- optional `tsconfig` for `type => DeployPhp\Assets::ESBUILD` - path (relative to the assets source directory) to a `tsconfig.json` to pass to esbuild; if not set, esbuild runs without a `--tsconfig` flag
 - required `file` or `files` for `type => DeployPhp\Assets::WATCH` - with a file or directory (not necessarily inside the assets source directory) whose timestamp (debug) or content (production) is included in the hash
 
 The next two parameters are callable function, the first is for reading hash from file, and the second is to write hash to file. In example is shown, how you can write it to neon and use it with Nette DI.
@@ -131,6 +137,35 @@ In your HTML, you can use both files like this:
 <script type="module" src="/js/scripts.esm.js"></script>
 ```
 
+#### esbuild environment
+
+Unlike `rollup.js`, `esbuild` needs no configuration file - it bundles a single source file (JavaScript or TypeScript) directly into one `iife` output file. In debug mode a source map is generated (`--sourcemap`); in production the output is minified (`--minify`) instead.
+
+```php
+'js/app.js' => [ // target file
+    'type' => DeployPhp\Assets::ESBUILD,
+    'file' => 'ts/app.ts', // source file to bundle - JS or TS
+    'tsconfig' => 'ts/tsconfig.json', // optional, path relative to the assets source directory, omit to run esbuild without a --tsconfig flag
+],
+```
+
+The `tsconfig` is only needed when bundling TypeScript and you want esbuild to respect its `compilerOptions` (e.g. `target`, `jsx`, `paths`, decorators). Note that esbuild only reads `compilerOptions` from it to transform the code - it doesn't type-check, so running `tsc --noEmit` separately (e.g. in CI) is recommended if you want type errors caught.
+
+Create `assets/ts/tsconfig.json`:
+
+```json
+{
+    "compilerOptions": {
+        "target": "ES2020",
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "strict": true,
+        "skipLibCheck": true,
+        "noEmit": true
+    }
+}
+```
+
 #### Example
 
 In `deploy/assets.php`:
@@ -177,6 +212,11 @@ return (new DeployPhp\Assets(
         'js/scripts.{format}.js' => [ // target file - will be compiled for more formats
             'type' => DeployPhp\Assets::ROLLUP,
             'file' => 'js/index.js',
+        ],
+        'js/app.js' => [ // target file
+            'type' => DeployPhp\Assets::ESBUILD,
+            'file' => 'ts/app.ts',
+            'tsconfig' => 'ts/tsconfig.json', // optional, omit to run esbuild without a tsconfig
         ],
         'package-lock.json-watch' => [ // key is just a label, no output is produced
             'type' => DeployPhp\Assets::WATCH,
@@ -249,7 +289,7 @@ $container = $configurator->createContainer();
 
 In debug mode, hash is calculated from every assets file timestamp - creating hash is fast (if you change file or add/remove some file, hash is changed and assets are automatically rebuilt before the request is performed).
 
-In Nette, you need to define you own Assets extension, that will read hash from ```assets.hash``` and with some sort of service, you can use it in your application. For example, like this:
+In Nette, you need to define you own Assets extension, that will read hash from `assets.hash` and with some sort of service, you can use it in your application. For example, like this:
 
 ```php
 // Service to use in application
@@ -303,7 +343,7 @@ class Extension extends CompilerExtension
 }
 ```
 
-In your application, you can use hash as query parameter ```styles.css?hash``` or as virtual path in web server, example for nginx, load assets at path ```/assets/hash/styles.css```:
+In your application, you can use hash as query parameter `styles.css?hash` or as virtual path in web server, example for nginx, load assets at path `assets/hash/styles.css`:
 
 ```
 location /assets/ {
