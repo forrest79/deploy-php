@@ -78,7 +78,12 @@ class Assets
 		array $localConfig = [],
 	)
 	{
-		$this->sourceDirectory = rtrim($sourceDirectory, '\\/');
+		$sourceDirectoryRealPath = realpath(rtrim($sourceDirectory, '\\/'));
+		if ($sourceDirectoryRealPath === false) {
+			throw new Exceptions\AssetsException(sprintf('Source directory \'%s\' doesn\'t exists', $sourceDirectory));
+		}
+
+		$this->sourceDirectory = $sourceDirectoryRealPath;
 
 		$this->config = $config;
 		$this->watch = $watch;
@@ -88,7 +93,9 @@ class Assets
 
 		if (isset($localConfig[self::CONFIG_SYSTEM_BIN_PATH])) {
 			$this->systemBinPath = trim($localConfig[self::CONFIG_SYSTEM_BIN_PATH], ':');
-		} else if (isset($localConfig[self::CONFIG_LOCAL_SOURCE_DIRECTORY])) {
+		}
+
+		if (isset($localConfig[self::CONFIG_LOCAL_SOURCE_DIRECTORY])) {
 			$this->localSourceDirectory = rtrim($localConfig[self::CONFIG_LOCAL_SOURCE_DIRECTORY], '\\/');
 		}
 
@@ -238,18 +245,24 @@ class Assets
 
 	private function compilesSass(string $sourceFile, string $destinationFile, bool $createMap): void
 	{
+		$destinationPath = $this->prepareDestinationPath($destinationFile);
+
 		$this->exec(sprintf(
-			'%s --quiet --style=compressed %s %s %s',
+			'%s --quiet --style=compressed%s %s %s',
 			$this->npxCommand('sass'),
-			$createMap ? '--embed-source-map --embed-sources' : '--no-source-map',
+			$createMap ? '' : ' --no-source-map',
 			$sourceFile,
-			$this->prepareDestinationPath($destinationFile),
+			$destinationPath,
 		), 'css-sass');
+
+		if ($createMap) {
+			$this->absolutizeSourceMap($destinationPath . '.map');
+		}
 	}
 
 
 	/**
-	 * @param array<string> $sourceFiles
+	 * @param list<string> $sourceFiles
 	 */
 	private function compilesJs(array $sourceFiles, string $destinationFile, bool $createMap): void
 	{
@@ -309,14 +322,61 @@ class Assets
 		bool $createMap,
 	): void
 	{
+		$destinationPath = $this->prepareDestinationPath($destinationFile);
+
 		$this->exec(sprintf(
 			'%s %s --bundle --format=iife %s--outfile=%s%s',
 			$this->npxCommand('esbuild'),
 			$sourceFile,
 			$tsconfig !== null ? sprintf('--tsconfig=%s ', $tsconfig) : '',
-			$this->prepareDestinationPath($destinationFile),
-			$createMap ? ' --sourcemap' : ' --minify',
+			$destinationPath,
+			$createMap ? ' --sourcemap --sources-content=false' : ' --minify',
 		), 'js-esbuild');
+
+		if ($createMap) {
+			$this->absolutizeSourceMap($destinationPath . '.map');
+		}
+	}
+
+
+	private function absolutizeSourceMap(string $mapFile): void
+	{
+		$mapContents = file_get_contents($mapFile);
+		if ($mapContents === false) {
+			throw new Exceptions\AssetsException(sprintf('Map file \'%s\' doesn\'t exists', $mapFile));
+		}
+
+		$map = Utils\Json::decode($mapContents, forceArrays: true);
+		assert(is_array($map) && isset($map['sources']) && is_array($map['sources']));
+
+		$mapDirectory = dirname($mapFile);
+
+		// Normalized to forward slashes - may be a plain POSIX path or a Windows UNC path
+		// (\\host\share\...) when the browser doesn't share the compiling machine's filesystem
+		// (e.g. assets built inside WSL2/an LXC guest, browser running as a Windows process).
+		$browserSourceDirectory = str_replace('\\', '/', $this->localSourceDirectory ?? $this->sourceDirectory);
+
+		$sources = [];
+		foreach ($map['sources'] as $source) {
+			assert(is_string($source));
+
+			$realSource = realpath($mapDirectory . DIRECTORY_SEPARATOR . $source);
+			if (($realSource === false) || !str_starts_with($realSource, $this->sourceDirectory . DIRECTORY_SEPARATOR)) {
+				$sources[] = $source;
+				continue;
+			}
+
+			$target = $browserSourceDirectory . substr($realSource, strlen($this->sourceDirectory));
+
+			// UNC target ('//host/share/...') needs the host as the URL authority - file://host/...
+			// A POSIX target ('/abs/path') needs an empty authority - file:///abs/path.
+			$sources[] = str_starts_with($target, '//') ? ('file:' . $target) : ('file://' . $target);
+		}
+
+		$map['sources'] = $sources;
+		unset($map['sourcesContent']);
+
+		file_put_contents($mapFile, Utils\Json::encode($map));
 	}
 
 
