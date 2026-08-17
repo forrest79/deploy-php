@@ -22,6 +22,9 @@ class Assets
 	public const string ROLLUP = 'rollup';
 	public const string ESBUILD = 'esbuild';
 
+	public const string CONFIG_SYSTEM_BIN_PATH = 'systemBinPath';
+	public const string CONFIG_LOCAL_SOURCE_DIRECTORY = 'localSourceDirectory';
+
 	private const string DEFAULT_SYSTEM_BIN_PATH = '/usr/bin:/bin';
 
 	/** @phpstan-var AssetsConfig */
@@ -83,10 +86,10 @@ class Assets
 		$this->readHash = $readHash;
 		$this->writeHash = $writeHash;
 
-		if (isset($localConfig['systemBinPath'])) {
-			$this->systemBinPath = trim($localConfig['systemBinPath'], ':');
-		} else if (isset($localConfig['localSourceDirectory'])) {
-			$this->localSourceDirectory = rtrim($localConfig['localSourceDirectory'], '\\/');
+		if (isset($localConfig[self::CONFIG_SYSTEM_BIN_PATH])) {
+			$this->systemBinPath = trim($localConfig[self::CONFIG_SYSTEM_BIN_PATH], ':');
+		} else if (isset($localConfig[self::CONFIG_LOCAL_SOURCE_DIRECTORY])) {
+			$this->localSourceDirectory = rtrim($localConfig[self::CONFIG_LOCAL_SOURCE_DIRECTORY], '\\/');
 		}
 
 		$this->lockFile = $tempDirectory . DIRECTORY_SEPARATOR . 'assets.lock';
@@ -238,7 +241,7 @@ class Assets
 		$this->exec(sprintf(
 			'%s --quiet --style=compressed %s %s %s',
 			$this->npxCommand('sass'),
-			$createMap ? '--embed-source-map' : '--no-source-map',
+			$createMap ? '--embed-source-map --embed-sources' : '--no-source-map',
 			$sourceFile,
 			$this->prepareDestinationPath($destinationFile),
 		), 'css-sass');
