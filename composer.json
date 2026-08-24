@@ -13,7 +13,7 @@
 	"require": {
 		"php": "^8.3",
 		"nette/utils": "^4.0",
-		"phpseclib/phpseclib": "^3.0"
+		"phpseclib/phpseclib": "^4.0"
 	},
 	"require-dev": {
 		"forrest79/phpcs": "^2.3",

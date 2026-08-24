@@ -3,10 +3,10 @@
 namespace Forrest79\DeployPhp;
 
 use Nette\Utils;
-use phpseclib3\Crypt;
-use phpseclib3\Exception;
-use phpseclib3\Net;
-use phpseclib3\System;
+use phpseclib4\Crypt;
+use phpseclib4\Exception;
+use phpseclib4\Net;
+use phpseclib4\System;
 
 /**
  * @phpstan-type EnvironmentType array{server: string, port: int, username: string, private_key?: string, passphrase?: string|callable(static, string): (string|null)|null, ssh_agent?: string|bool}
@@ -157,7 +157,7 @@ class Deploy
 		int|null $port = null,
 	): bool
 	{
-		$output = $this->sshExec($this->sshConnection(Net\SSH2::class, $host, $port), $command . ';echo "[return_code:$?]"');
+		$output = $this->sshConnection(Net\SSH2::class, $host, $port)->exec($command . ';echo "[return_code:$?]"');
 
 		preg_match('/\[return_code:(.*?)\]/', $output, $match);
 		$output = preg_replace('/\[return_code:(.*?)\]/', '', $output);
@@ -185,18 +185,18 @@ class Deploy
 		string $remoteDirectory,
 		string|null $host = null,
 		int|null $port = null,
-	): bool
+	): void
 	{
 		$remoteDirectory = rtrim($remoteDirectory, '/');
 
 		$sftp = $this->sshConnection(Net\SFTP::class, $host, $port);
 		assert($sftp instanceof Net\SFTP);
 
-		$this->sshExec($sftp, 'mkdir -p ' . $remoteDirectory); // create remote directory if doesn't
-		$remoteAbsoluteDirectory = (str_starts_with($remoteDirectory, '/')) ? $remoteDirectory : (trim($this->sshExec($sftp, 'pwd')) . '/' . $remoteDirectory);
+		$sftp->exec('mkdir -p ' . $remoteDirectory); // create remote directory if doesn't
+		$remoteAbsoluteDirectory = (str_starts_with($remoteDirectory, '/')) ? $remoteDirectory : (trim($sftp->exec('pwd')) . '/' . $remoteDirectory);
 		$remoteFile = $remoteAbsoluteDirectory . '/' . basename($localFile);
 
-		return $sftp->put($remoteFile, $localFile, Net\SFTP::SOURCE_LOCAL_FILE);
+		$sftp->put($remoteFile, $localFile, Net\SFTP::SOURCE_LOCAL_FILE);
 	}
 
 
@@ -307,18 +307,6 @@ class Deploy
 	private static function createSshConnection(string $class, string $host, int $port): Net\SSH2
 	{
 		return new $class($host, $port, 0);
-	}
-
-
-	private function sshExec(Net\SSH2 $sshConnection, string $command): string
-	{
-		$result = $sshConnection->exec($command);
-		if ($result === false) {
-			throw new Exceptions\DeployException(sprintf('SSH command \'%s\' failed', $command));
-		}
-
-		assert(is_string($result));
-		return $result;
 	}
 
 

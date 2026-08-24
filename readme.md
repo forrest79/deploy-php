@@ -470,8 +470,10 @@ class Deploy extends DeployPhp\Deploy
         $remoteReleaseDirectory = $this->environment['ssh']['directory'] . '/releases';
         $remoteReleaseBudilDirectory = $remoteReleaseDirectory . '/' . $this->releaseName;
         $this->log('     -> uploading build package', false);
-        if (!$this->sftpPut($this->releaseBuildPackage, $remoteReleaseDirectory)) {
-            $this->error(' ...an error occurred while uploading build package');
+        try {
+            $this->sftpPut($this->releaseBuildPackage, $remoteReleaseDirectory);
+        } catch (\Throwable $e) {
+            $this->error(' ...an error occurred while uploading build package: ' . $e->getMessage());
         }
         $this->log(' ...OK');
 
