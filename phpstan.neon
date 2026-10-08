@@ -13,3 +13,11 @@ parameters:
 			identifier: identical.alwaysFalse
 			count: 1
 			path: src/Deploy.php
+
+		# === False positive ===
+
+		-
+			rawMessage: 'Offset ''file'' might not exist on array{type: ''sass'', file?: string|null, env?: string, tsconfig?: string|null}.'
+			identifier: offsetAccess.notFound
+			count: 1
+			path: src/Assets.php
